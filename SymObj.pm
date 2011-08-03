@@ -320,13 +320,19 @@ sub obj_dump {
 1;
 __END__
 
-=head1 Sym(bolic) Obj(ect)
+=head1 S-SymObj
 
-SymObj provides an easy way to create and construct symbol-tables/objects.
-With a simple hash one defines class-fields an object should have,
-and SymObj will create nifty accessor subs for them.
-A generic constructor will then create the object and all of its superclasses;
-this even works for Multiple-Inheritance as good as perl(1) allows.
+SymObj.pm provides an easy way to create and construct symbol-tables
+and objects.  With a simple hash one defines class-fields an object
+should have, and SymObj will create nifty accessor subs for them.
+A generic constructor will then create the object and all of its
+superclasses, checking and filtering arguments along the way, which
+makes it pretty useful in times the interface is unstable.
+This even works for Multiple-Inheritance as good as perl(1) allows.
+
+S-SymObj is developed using a git(1) repository.
+Goto https://github.com/sdaoden/s-symobj.
+
 The following symbols exist:
 
 =over

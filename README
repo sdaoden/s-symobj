@@ -1,17 +1,33 @@
-Sym(bolic) Obj(ect)
-===================
+S-SymObj
+========
 
 Copyright (c) 2010 - 2011 Steffen Daode Nurpmeso <sdaoden@gmail.com>.
 All rights reserved.
 See the file SymObj.pm for license information.
 Have fun.
 
-SymObj provides an easy way to create and construct
-symbol-tables/objects. With a simple hash one defines class-fields an
-object should have, and SymObj will create nifty accessor subs for them.
+SymObj.pm provides an easy way to create and construct symbol-tables
+and objects.  With a simple hash one defines class-fields an object
+should have, and SymObj will create nifty accessor subs for them.
 A generic constructor will then create the object and all of its
-superclasses; this even works for Multiple-Inheritance as good as
-perl(1) allows.
+superclasses, checking and filtering arguments along the way, which
+makes it pretty useful in times the interface is unstable.
+This even works for Multiple-Inheritance as good as perl(1) allows.
+
+S-SymObj is developed using a git(1) repository.
+Goto https://github.com/sdaoden/s-symobj.
+
+
+Installation
+------------
+
+SymObj.pm is a Perl module.  It should be in @INC.
+To start off, simply place it in the directory in which the perl(1)
+script which shall use it resides.
+
+
+Usage
+-----
 
 Please use the pod2XY family of programs for the complete and
 up-to-date documentation on SymObj.pm, e.g.
@@ -20,10 +36,11 @@ up-to-date documentation on SymObj.pm, e.g.
 
 Create a class:
 
+    require 'SymObj.pm';
+
     {package SomePack;
         my %Fields;
         BEGIN {
-            require 'SymObj.pm';
             # Privacy enfored via _NAME - produced public
             # accessors are named NAME() nonetheless
             %Fields = (_name => '', _array => [], _hash => {} );
@@ -63,3 +80,33 @@ Use it:
     $sp->hash([qw(i you we all)]);
     $sp->hash({i => 'you', we => 'all'});
 
+
+Note on revision control
+------------------------
+
+2011 is a special year for me, also in respect to RC.  For many years
+i've used a mixed cvs(1)/svn(1) RC approach at home and at work.
+But this will become impossible in 2011, and a distributed approach
+with the possibility to progress locally, and thus easy merge support
+etc., will be necessary.
+
+I first tried git(1), but i've failed resoundingly.  I use version
+control daily, but i don't want to think about it.  Well, git(1) has
+a learning curve.  I've switched to hg(1) (Mercurial) and could use it
+immediately.  At work git(1) has been chosen, i tracked dulwich and
+hg-git.  But hg(1) uses Python and thus requires resources.  And there
+are killer features of git(1): add -i, rebase -i, and almost anything
+else with the plumbing.  It's even possible to *edit* patch hunks!
+
+(And, as a side note: the Python repository started off with about 260
+MB in march 2011, it was about 400 MB in mid-of-july.  Maybe something
+like 'git gc --aggressive' will be implemented in the future though..)
+So i decided to switch over to git(1) *everywhere*, even if it will
+require time to learn about it in detail.
+
+For SymObj.pm this means that there is an old public repository on
+BitBucket (https://bitbucket.org/sdaoden/symobj).  This will be
+supported as long as BitBucket doesn't throw away the repo!  That repo
+will effectively reflect the git(1) "master" branch.  (Luckily hg(1)
+supports patch series produced by "git format-patch --no-stat".)
+And then there is the git(1) repo mentioned above.
