@@ -1,0 +1,65 @@
+Sym(bolic) Obj(ect)
+===================
+
+Copyright (c) 2010 - 2011 Steffen Daode Nurpmeso <sdaoden@gmail.com>.
+All rights reserved.
+See the file SymObj.pm for license information.
+Have fun.
+
+SymObj provides an easy way to create and construct
+symbol-tables/objects. With a simple hash one defines class-fields an
+object should have, and SymObj will create nifty accessor subs for them.
+A generic constructor will then create the object and all of its
+superclasses; this even works for Multiple-Inheritance as good as
+perl(1) allows.
+
+Please use the pod2XY family of programs for the complete and
+up-to-date documentation on SymObj.pm, e.g.
+
+    pod2text SymObj.pm
+
+Create a class:
+
+    {package SomePack;
+        my %Fields;
+        BEGIN {
+            require 'SymObj.pm';
+            # Privacy enfored via _NAME - produced public
+            # accessors are named NAME() nonetheless
+            %Fields = (_name => '', _array => [], _hash => {} );
+            SymObj::sym_create(__PACKAGE__, \%Fields);
+        }
+
+        sub new { SymObj::obj_ctor(__PACKAGE__, shift, \%Fields, \@_); }
+    }
+
+Use it:
+
+    my $sp = SomePack->new(name => 'SymObj is easy');
+
+    # The constructor may also take these arguments:
+    # array => '1'
+    # array => ['1', '2', '3', '4']
+    # array => [qw(1 2 3 4)]
+    # array => {1 => '2', 3 => '4'}
+    # hash => [qw(i you we all)]
+    # hash => {i => 'you', we => 'all'}
+
+    my $name = $sp->name();
+    print $name, "\n"; # SymObj is easy
+    $name = $sp->name('SymObj is even easier');
+    print $name, "\n"; # SymObj is even easier
+
+    # All equal (and return reference to $sp->{_array})
+    $sp->array('1'); $sp->array('2'); $sp->array('3'); $sp->array('4');
+    $sp->array(qw(1 2 3 4));
+    $sp->array([qw(1 2 3 4)]);
+    $sp->array('1' => '2', '3' => '4');
+
+    # All equal (and return reference to $sp->{_hash})
+    $sp->hash(i => 'you', we => 'all');
+    $sp->hash('i', 'you', 'we', 'all');
+    $sp->hash(qw(i you we all));
+    $sp->hash([qw(i you we all)]);
+    $sp->hash({i => 'you', we => 'all'});
+
