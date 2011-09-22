@@ -110,3 +110,7 @@ supported as long as BitBucket doesn't throw away the repo!  That repo
 will effectively reflect the git(1) "master" branch.  (Luckily hg(1)
 supports patch series produced by "git format-patch --no-stat".)
 And then there is the git(1) repo mentioned above.
+
+P.S. (2011-09-22): i temporarily had the opinion that using
+"Signed-off-by:" lines are a good thing to have.
+I apologize.
