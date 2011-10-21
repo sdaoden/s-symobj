@@ -149,8 +149,9 @@ jOUTER:
                 my $self = $_[0];
                 if (ref $self)  { shift; }
                 else            { $self = $tfields; }
-                return $self->{$datum} if @_ ==  0;
-                return "${pkg}::_SymObj_ArraySet"->($self, $pub, $datum, @_);
+                $self = ((@_ == 0) ? $self->{$datum}
+                         : "${pkg}::_SymObj_ArraySet"->($self,$pub,$datum,@_));
+                return wantarray ? @$self : $self;
             };
         } elsif (ref $tfields->{$datum} eq 'HASH') {
             print STDERR "\tsub $pub: hash-based\n" if $SymObj::Verbose;
@@ -158,8 +159,9 @@ jOUTER:
                 my $self = $_[0];
                 if (ref $self)  { shift; }
                 else            { $self = $tfields; }
-                return $self->{$datum} if @_ ==  0;
-                return "${pkg}::_SymObj_HashSet"->($self, $pub, $datum, @_);
+                $self = ((@_ == 0) ? $self->{$datum}
+                         : "${pkg}::_SymObj_HashSet"->($self, $pub,$datum,@_));
+                return wantarray ? %$self : $self;
             };
         } else {
             # Scalar (or "typeless")
@@ -367,8 +369,9 @@ L<https://github.com/sdaoden/s-symobj/tarball/master>.
     # hash => [qw(i you we all)]
     # hash => {i => 'you', we => 'all'}
 
-    # The accessor subs also try to swallow everything, and they always
-    # return a reference (except for scalars) to the updated internal data
+    # The accessor subs also try to swallow everything.
+    # They return references, except for scalars (always) and in wantarray
+    # context, in which case you get a copy
     my $v = $sp->name('SymObj is really nice to use');
     print "name is <$v>\n";
 
@@ -377,12 +380,14 @@ L<https://github.com/sdaoden/s-symobj/tarball/master>.
     $vr = $sp->array(qw( 1_2                2_2));
     $vr = $sp->array([qw(1_3                2_3)]);
     $vr = $sp->array(   '1_4' =>           '2_4');
+    my @arrcopy = $sp->array(); # wantarray context gives copy instead
 
     $vr = $sp->hash(    i_1 => 'you',  we_1 => 'all');
     $vr = $sp->hash(   'i_2',  'you', 'we_2',  'all');
     $vr = $sp->hash(qw( i_3     you    we_3     all));
     $vr = $sp->hash([qw(i_4     you    we_4     all)]);
     $vr = $sp->hash({   i_5 => 'you',  we_5 => 'all'});
+    my %hashcopy = $sp->hash(); # wantarray context gives copy instead
 
     SymObj::obj_dump($sp);
 
