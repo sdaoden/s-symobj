@@ -6,16 +6,25 @@ All rights reserved.
 See the file SymObj.pm for license information.
 Have fun.
 
-SymObj.pm provides an easy way to create and construct symbol-tables
-and objects.  With a simple hash one defines class-fields an object
-should have, and SymObj will create nifty accessor subs for them.
-A generic constructor will then create the object and all of its
+SymObj.pm provides an easy way to create and construct symbol-tables and
+objects.  With a simple hash one defines class-fields an object should
+have.  A generic constructor will then create the object and all of its
 superclasses, checking and filtering arguments along the way, which
-makes it pretty useful in times the interface is unstable.
-This even works for Multiple-Inheritance as good as perl(1) allows.
+makes it pretty useful in times when the interface is unstable.  The
+generated accessor subs which are created for arrays and hashes
+implement a *feed in and forget* approach, since they can handle all
+kinds of arguments (or try it); this is also true for the constructor.
 
-S-SymObj is developed using a git(1) repository.
-Goto https://github.com/sdaoden/s-symobj.
+SymObj.pm works for Multiple-Inheritance as good as perl(1) allows.
+(That is to say that only one straight object tree can used,
+further trees of @ISA need to be joined in, say.)
+It should integrate neatlessly into SMP in respect to objects;
+package "static-data" however is not protected.
+
+S-SymObj is developed using a git(1) repository, which is located at
+https://github.com/sdaoden/s-symobj.
+To download the latest version as a tarball, use
+https://github.com/sdaoden/s-symobj/tarball/master.
 
 
 Installation
@@ -34,15 +43,13 @@ up-to-date documentation on SymObj.pm, e.g.
 
     pod2text SymObj.pm
 
-Create a class:
+The example from the documentation as of 2011-10-21:
 
-    require 'SymObj.pm';
+    BEGIN { require 'SymObj.pm'; }
 
-    {package SomePack;
+    {package X_Super;
         my %Fields;
         BEGIN {
-            # Privacy enfored via _NAME - produced public
-            # accessors are named NAME() nonetheless
             %Fields = (_name => '', _array => [], _hash => {} );
             SymObj::sym_create(__PACKAGE__, \%Fields);
         }
@@ -50,35 +57,47 @@ Create a class:
         sub new { SymObj::obj_ctor(__PACKAGE__, shift, \%Fields, \@_); }
     }
 
-Use it:
+    {package SomePack;
+        our (@ISA);
+        BEGIN {
+            @ISA = ('X_Super');
+            SymObj::sym_create(__PACKAGE__, {}); # <- adds no fields on its own
+        }
 
-    my $sp = SomePack->new(name => 'SymObj is easy');
+        sub new { SymObj::obj_ctor(__PACKAGE__, shift, {}, \@_); } # <- ..
+    }
 
-    # The constructor may also take these arguments:
-    # array => '1'
+    my $sp = SomePack->new(name => 'SymObj is easy', 'unknown' => 'arg');
+
+    # Other possible ctor arguments to init ->array() and ->hash()
+    # array => '1' # (Need to push the rest later on)
     # array => ['1', '2', '3', '4']
     # array => [qw(1 2 3 4)]
     # array => {1 => '2', 3 => '4'}
     # hash => [qw(i you we all)]
     # hash => {i => 'you', we => 'all'}
 
-    my $name = $sp->name();
-    print $name, "\n"; # SymObj is easy
-    $name = $sp->name('SymObj is even easier');
-    print $name, "\n"; # SymObj is even easier
+    # The accessor subs also try to swallow everything.
+    # They return references, except for scalars (always) and in wantarray
+    # context, in which case you get a copy
+    my $v = $sp->name('SymObj is really nice to use');
+    print "name is <$v>\n";
 
-    # All equal (and return reference to $sp->{_array})
-    $sp->array('1'); $sp->array('2'); $sp->array('3'); $sp->array('4');
-    $sp->array(qw(1 2 3 4));
-    $sp->array([qw(1 2 3 4)]);
-    $sp->array('1' => '2', '3' => '4');
+    my $vr;
+    $vr = $sp->array(   '1_1'); $sp->array('2_1');
+    $vr = $sp->array(qw( 1_2                2_2));
+    $vr = $sp->array([qw(1_3                2_3)]);
+    $vr = $sp->array(   '1_4' =>           '2_4');
+    my @arrcopy = $sp->array(); # wantarray context gives copy instead
 
-    # All equal (and return reference to $sp->{_hash})
-    $sp->hash(i => 'you', we => 'all');
-    $sp->hash('i', 'you', 'we', 'all');
-    $sp->hash(qw(i you we all));
-    $sp->hash([qw(i you we all)]);
-    $sp->hash({i => 'you', we => 'all'});
+    $vr = $sp->hash(    i_1 => 'you',  we_1 => 'all');
+    $vr = $sp->hash(   'i_2',  'you', 'we_2',  'all');
+    $vr = $sp->hash(qw( i_3     you    we_3     all));
+    $vr = $sp->hash([qw(i_4     you    we_4     all)]);
+    $vr = $sp->hash({   i_5 => 'you',  we_5 => 'all'});
+    my %hashcopy = $sp->hash(); # wantarray context gives copy instead
+
+    SymObj::obj_dump($sp);
 
 
 Note on revision control
