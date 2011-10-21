@@ -1,9 +1,7 @@
-#@ S-Sym(bolic)Obj(ect) - easy creation of objects.
+#@ S-Sym(bolic)Obj(ect) - easy creation of classes and objects thereof.
 package SymObj;
 require 5.008;
 $VERSION = '0.5.0';
-#
-# Created: 2010-04-19
 $COPYRIGHT =<<_EOT;
 Copyright (c) 2010 - 2011 Steffen Daode Nurpmeso <sdaoden\@gmail.com>.
 All rights reserved.
@@ -315,22 +313,84 @@ __END__
 
 =head1 S-SymObj
 
-SymObj.pm provides an easy way to create and construct symbol-tables
-and objects.  With a simple hash one defines class-fields an object
-should have, and SymObj will create nifty accessor subs for them.
-A generic constructor will then create the object and all of its
+SymObj.pm provides an easy way to create and construct symbol-tables and
+objects.  With a simple hash one defines class-fields an object should
+have.  A generic constructor will then create the object and all of its
 superclasses, checking and filtering arguments along the way, which
-makes it pretty useful in times the interface is unstable.
-This even works for Multiple-Inheritance as good as perl(1) allows.
+makes it pretty useful in times when the interface is unstable.
+The generated accessor subs which are created for arrays and hashes
+implement a B<feed in and forget> approach, since they can handle all
+kinds of arguments (or try it); this is also true for the constructor.
 
-S-SymObj is developed using a git(1) repository.
-Goto https://github.com/sdaoden/s-symobj.
+SymObj.pm works for Multiple-Inheritance as good as perl(1) allows.
+(That is to say that only one straight object tree can used,
+further trees of C<@ISA> need to be joined in, say.)
+It should integrate neatlessly into SMP in respect to objects;
+package "static-data" however is not protected.
 
-The following symbols exist:
+S-SymObj is developed using a git(1) repository, which is located at
+L<https://github.com/sdaoden/s-symobj>.
+To download the latest version as a tarball, use
+L<https://github.com/sdaoden/s-symobj/tarball/master>.
+
+=head2 Usage example
+
+    BEGIN { require 'SymObj.pm'; }
+
+    {package X_Super;
+        my %Fields;
+        BEGIN {
+            %Fields = (_name => '', _array => [], _hash => {} );
+            SymObj::sym_create(__PACKAGE__, \%Fields);
+        }
+
+        sub new { SymObj::obj_ctor(__PACKAGE__, shift, \%Fields, \@_); }
+    }
+
+    {package SomePack;
+        our (@ISA);
+        BEGIN {
+            @ISA = ('X_Super');
+            SymObj::sym_create(__PACKAGE__, {}); # <- adds no fields on its own
+        }
+
+        sub new { SymObj::obj_ctor(__PACKAGE__, shift, {}, \@_); } # <- ..
+    }
+
+    my $sp = SomePack->new(name => 'SymObj is easy', 'unknown' => 'arg');
+
+    # Other possible ctor arguments to init ->array() and ->hash()
+    # array => '1' # (Need to push the rest later on)
+    # array => ['1', '2', '3', '4']
+    # array => [qw(1 2 3 4)]
+    # array => {1 => '2', 3 => '4'}
+    # hash => [qw(i you we all)]
+    # hash => {i => 'you', we => 'all'}
+
+    # The accessor subs also try to swallow everything, and they always
+    # return a reference (except for scalars) to the updated internal data
+    my $v = $sp->name('SymObj is really nice to use');
+    print "name is <$v>\n";
+
+    my $vr;
+    $vr = $sp->array(   '1_1'); $sp->array('2_1');
+    $vr = $sp->array(qw( 1_2                2_2));
+    $vr = $sp->array([qw(1_3                2_3)]);
+    $vr = $sp->array(   '1_4' =>           '2_4');
+
+    $vr = $sp->hash(    i_1 => 'you',  we_1 => 'all');
+    $vr = $sp->hash(   'i_2',  'you', 'we_2',  'all');
+    $vr = $sp->hash(qw( i_3     you    we_3     all));
+    $vr = $sp->hash([qw(i_4     you    we_4     all)]);
+    $vr = $sp->hash({   i_5 => 'you',  we_5 => 'all'});
+
+    SymObj::obj_dump($sp);
+
+=head2 Package-Symbols
 
 =over
 
-=item C<$SymObj::VERSION> (string i.e. '0.5.0')
+=item C<$SymObj::VERSION> (string i.e. '0.5.1')
 
 A version string.
 
@@ -338,14 +398,16 @@ A version string.
 
 Copyright multiline string, formatted for pretty printing.
 
-=item C<$SymObj::Debug> (boolean i.e. 0 or xy, default 0)
+=item C<$SymObj::Debug> (boolean i.e. 0 or xy, default 1)
 
 Indicates wether some checks etc. shall be performed or not.
+By default enabled.
 Messages go to STDERR.
 
 =item C<$SymObj::Verbose> (boolean i.e. 0 or xy, default 0)
 
 If enabled some more informational etc. messages go to STDERR.
+By default disabled.
 
 =item C<pack_exists(C<$1>=string=package/class)>
 
@@ -358,35 +420,18 @@ for all keys of C<$2>
 I<and> do some more magic symbol table housekeeping to make SymObj work.
 All (public) symbols of C<$3>, if given, will be skipped.
 Due to the additional magic this must be called even if no fields exist,
-yet even if C<$2> is the empty anonymous C<{}> hash.
-(See C<obj_ctor> for an example.)
+yet even if C<$2> is the empty anonymous C<{}> hash (as shown above).
 
 SymObj generally "enforces" privacy (by definition) via an underscore prefix:
 all keys of C<$2> are expected to start with an underscore,
 but the public accessor methods will miss that (C<_data> gets C<data>).
-The exclusion list C<$3> needs to refer to public symbols.
+The exclusion list C<$3> is expected to name public symbols instead.
 
 The created accessor subs work as methods if a C<$self> object exists
-(as in C<$self-E<gt>name()>) and as functions otherwise (SomePack::name()),
-in which case the provided template hash (C<$2>) is used!
-They also get I<and> set values.
-E.g. C<$self-E<gt>name('NEW NAME')> sets (and returns) a new name,
-whereas C<$self-E<gt>name> only returns the current one.
-The accessor subs which are created for arrays and hashes also implement
-a B<feed in and forget> approach:
-
-    # All equal (and return reference to $sp->{_array})
-    $sp->array('1'); $sp->array('2'); $sp->array('3'); $sp->array('4');
-    $sp->array(qw(1 2 3 4));
-    $sp->array([qw(1 2 3 4)]);
-    $sp->array('1' => '2', '3' => '4');
-
-    # All equal (and return reference to $sp->{_hash})
-    $sp->hash(i => 'you', we => 'all');
-    $sp->hash('i', 'you', 'we', 'all');
-    $sp->hash(qw(i you we all));
-    $sp->hash([qw(i you we all)]);
-    $sp->hash({i => 'you', we => 'all'});
+(as in C<$self-E<gt>name()>) and as functions otherwise (C<SomePack::name()>),
+in which case the provided package template hash (C<$2>) is used!
+(Note that no locking is performed in the latter case, i.e., this should
+not be done in multithreaded programs.)
 
 =item C<sym_dump($1=string OR object=symbol table target)>
 
@@ -403,31 +448,6 @@ it is a hash which defines the key/value tuples to be overwritten:
 these will be merged into C<$4> if, and only if, they are not yet contained
 therein; note that the hash is ignored unless there really is a C<@ISA>,
 and that it's keys must refer to public names.
-
-    {package SomePack;
-        my %Fields;
-        BEGIN {
-            require 'SymObj.pm';
-            %Fields = (_name => '', _array => [], _hash => {} );
-            SymObj::sym_create(__PACKAGE__, \%Fields);
-            # Or: SymObj::sym_create(__PACKAGE__, \%Fields, ['name']);
-        }
-
-        sub new { SymObj::obj_ctor(__PACKAGE__, shift, \%Fields, \@_); }
-    }
-
-    # Also possible:
-    # array => '1' # (And the rest to be pushed later)
-    # array => ['1', '2', '3', '4']
-    # array => [qw(1 2 3 4)]
-    # array => {1 => '2', 3 => '4'}
-    # hash => [qw(i you we all)]
-    # hash => {i => 'you', we => 'all'}
-
-    my $sp = SomePack->new(name => 'SymObj is easy');
-    SymObj::obj_dump($sp);
-    $sp->name('SymObj is even easier');
-    SymObj::obj_dump($sp);
 
 =item C<obj_dump($1=$self)>
 
