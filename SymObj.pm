@@ -1,7 +1,7 @@
 #@ S-Sym(bolic)Obj(ect) - easy creation of classes and objects thereof.
 package SymObj;
 require 5.008;
-$VERSION = '0.5.0';
+$VERSION = '0.5.1';
 $COPYRIGHT =<<_EOT;
 Copyright (c) 2010 - 2011 Steffen Daode Nurpmeso <sdaoden\@gmail.com>.
 All rights reserved.
