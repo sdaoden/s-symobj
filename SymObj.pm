@@ -47,7 +47,7 @@ BEGIN {
 $Debug = 1;
 $Verbose = 0;
 
-sub _UUID { return '1C8288D6-9EDA-4ECD-927F-2144B94186AD'; }
+sub _UUID { return 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD'; }
 
 # TODO pack_ series incomplete (available in eval?? require??) MOVE ON!!
 sub pack_exists {
@@ -71,11 +71,11 @@ sub sym_create {
                 push(@$dref, $_) foreach (@$arg);
             } elsif (ref $arg eq 'HASH') {
                 while (my ($k, $v) = each %$arg) {
-                    push(@$dref, $k);
-                    push(@$dref, $v);
+                    push @$dref, $k;
+                    push @$dref, $v;
                 }
             } else {
-                push(@$dref, $arg);
+                push @$dref, $arg;
             }
         }
 
@@ -98,24 +98,18 @@ sub sym_create {
                 }
             } elsif (ref $arg eq 'ARRAY') {
                 while (@$arg > 1) {
-                    my $v = pop(@$arg);
-                    my $k = pop(@$arg);
+                    my $v = pop @$arg;
+                    my $k = pop @$arg;
                     $dref->{$k} = $v;
                 }
-                if (@$arg != 0 && $SymObj::Debug) {
-                    print STDERR
-                        "! ${pkg}::${pub}(): ",
-                        'bad argument-array ',
-                        "argument count!\n";
-                }
+                print STDERR "! ${pkg}::${pub}(): wrong array member count!\n"
+                    if (@$arg != 0 && $SymObj::Debug);
             } else {
                 $k = $arg;
             }
         }
-        if (defined $k && $SymObj::Debug) {
-            print STDERR "! ${pkg}::${pub}(): ",
-                "missing value for argument '$k'\n";
-        }
+        print STDERR "! ${pkg}::${pub}(): '$k' key without a value\n"
+            if (defined $k && $SymObj::Debug);
 
         return $dref;
     };
@@ -129,8 +123,8 @@ sub sym_create {
         foreach my $super (@{*{"${pkg}::ISA"}}) {
             my $socr = *{"${super}::_SymObj_AllCTorArgs"};
             unless (defined $socr) {
-                print STDERR "! ${pkg}: \@ISA entry $super " .
-                             "not a SymObj managed class!\n";
+                print STDERR "! ${pkg}: \@ISA entry '$super' is not a SymObj ",
+                             "managed class!\n";
                 next;
             }
             $socargs{$_} = $_ foreach (keys %$socr);
@@ -141,12 +135,12 @@ jOUTER:
     # Create accessor symtable entries
     foreach my $datum (keys %$tfields) {
         my $pub = $datum;
-        $pub = substr($pub, 1) if index($pub, '_') == 0;
+        $pub = substr($pub, 1) if (0 == index $pub, '_');
         $socargs{$pub} = $pub;
 
         foreach (@$exlist) {
             if ($pub eq $_) {
-                print STDERR "\tSymbol $pub excluded\n" if $SymObj::Verbose;
+                print STDERR "\tSymbol '$pub' excluded\n" if $SymObj::Verbose;
                 next jOUTER;
             }
         }
@@ -198,10 +192,12 @@ sub obj_ctor {
 
     my ($self, $argc, $init_chain) = (undef, scalar @$argaref, 0);
 
-    # Savage and dumb but multithread-safe way to perform
-    # argument checking only in CTOR of real (actual sub-) class
+    # Since all classes use obj_ctor in their new, we would perform argument
+    # checking over and over again; so use a savage and hacky, but
+    # multithread-safe way to perform argument checking only in the ctor of
+    # the real (actual sub-) class
     if ($SymObj::Debug && $argc > 0 &&
-        defined $argaref->[0] && $argaref->[0] eq _UUID) {
+            defined $argaref->[0] && $argaref->[0] eq _UUID) {
         $init_chain = 1;
     }
 
@@ -210,11 +206,11 @@ sub obj_ctor {
 jOVER_OUTER:
         # Append overrides
         foreach my $k (keys %$over) {
-            for (my $i = $init_chain; $i < $argc; $i +=2) {
+            for (my $i = $init_chain; $i < $argc; $i += 2) {
                 next jOVER_OUTER if $k eq $$argaref[$i];
             }
-            push(@$argaref, $k);
-            push(@$argaref, $over->{$k});
+            push @$argaref, $k;
+            push @$argaref, $over->{$k};
         }
 
         # Walk the new() chain,
@@ -225,11 +221,9 @@ jOVER_OUTER:
             my $sym = "${_}::new";
             unless (defined *$sym) {
                 next unless $SymObj::Debug;
-                print STDERR "${pkg}: $class->new(): ",
-                             "no such package: $_!\n"
-                    and next unless defined(*{"${_}::"});
-                print STDERR "${pkg}: $class->new(): ",
-                             "package $_: no new() sub!\n";
+                print STDERR "${pkg}: $class->new(): no such package: $_!\n"
+                    and next unless defined *{"${_}::"};
+                print STDERR "${pkg}: $class->new(): $_: misses a new() sub!\n";
                 next;
             }
             $sym = &$sym($class, @$argaref);
@@ -241,12 +235,12 @@ jOVER_OUTER:
             while (my ($k, $v) = each %$sym) { $self->{$k} = $v; }
         }
 
-        shift(@$argaref) if ($SymObj::Debug && !$init_chain);
+        shift @$argaref if ($SymObj::Debug && !$init_chain);
     }
 
     # SELF
     $self = {} unless defined $self;
-    $self = bless($self, $class);
+    $self = bless $self, $class;
 
     # Default field(-value)s.
     # By default anon-hashes and -arrays get reference-copied;
@@ -262,10 +256,9 @@ jOVER_OUTER:
             my (%h, $hk, $hv);
             while (($hk, $hv) = each %$v) { $h{$hk} = $hv; }
             $self->{$k} = \%h;
-        } else {
-            print STDERR "${pkg}: $class->new(): ",
-                         "$v is of an unsupported type!\n"
-                if $SymObj::Debug;
+        } elsif ($SymObj::Debug) {
+            print STDERR "${pkg}: $class->new(): value of '$k' has an ",
+                         "unsupported type!\n";
         }
     }
 
@@ -273,7 +266,7 @@ jOVER_OUTER:
     $over = undef;
     if ($SymObj::Debug) {
         if ($init_chain) {
-            shift(@$argaref);
+            shift @$argaref;
         } else {
             $over = *{"${pkg}::_SymObj_AllCTorArgs"};
             if (($argc & 1) != 0) {
@@ -293,7 +286,7 @@ jOVER_OUTER:
         unless (exists $tfields->{$pk}) {
             next unless defined $over;
             next if exists $over->{$k};
-            print STDERR "${pkg}: $class->new(): unknown argument: $k\n";
+            print STDERR "${pkg}: $class->new(): unknown argument: '$k'\n";
         } elsif (ref $tv eq 'ARRAY') {
             $self->_SymObj_ArraySet('new()', $pk, $v);
         } elsif (ref $tv eq 'HASH') {
