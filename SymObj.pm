@@ -330,10 +330,9 @@ further trees of C<@ISA> need to be joined in, say.)
 It should integrate neatlessly into SMP in respect to objects;
 package "static-data" however is not protected.
 
-S-SymObj is developed using a git(1) repository, which is located at
-L<https://github.com/sdaoden/s-symobj>.
-To download the latest version as a tarball, use
-L<https://github.com/sdaoden/s-symobj/tarball/master>.
+S-SymObj is located at L<https://sourceforge.net/projects/ssymobj>;
+it is developed using a git(1) repository, which is located at
+C<git.code.sf.net/p/ssymobj/code>.
 
 =head2 Usage example
 

@@ -21,10 +21,9 @@ further trees of @ISA need to be joined in, say.)
 It should integrate neatlessly into SMP in respect to objects;
 package "static-data" however is not protected.
 
-S-SymObj is developed using a git(1) repository, which is located at
-https://github.com/sdaoden/s-symobj.
-To download the latest version as a tarball, use
-https://github.com/sdaoden/s-symobj/tarball/master.
+S-SymObj is located at https://sourceforge.net/projects/ssymobj;
+it is developed using a git(1) repository, which is located at
+git.code.sf.net/p/ssymobj/code.
 
 
 Installation
@@ -98,38 +97,3 @@ The example from the documentation as of 2011-10-21:
     my %hashcopy = $sp->hash(); # wantarray context gives copy instead
 
     SymObj::obj_dump($sp);
-
-
-Note on revision control
-------------------------
-
-2011 is a special year for me, also in respect to RC.  For many years
-i've used a mixed cvs(1)/svn(1) RC approach at home and at work.
-But this will become impossible in 2011, and a distributed approach
-with the possibility to progress locally, and thus easy merge support
-etc., will be necessary.
-
-I first tried git(1), but i've failed resoundingly.  I use version
-control daily, but i don't want to think about it.  Well, git(1) has
-a learning curve.  I've switched to hg(1) (Mercurial) and could use it
-immediately.  At work git(1) has been chosen, i tracked dulwich and
-hg-git.  But hg(1) uses Python and thus requires resources.  And there
-are killer features of git(1): add -i, rebase -i, and almost anything
-else with the plumbing.  It's even possible to *edit* patch hunks!
-
-(And, as a side note: the Python repository started off with about 260
-MB in march 2011, it was about 400 MB in mid-of-july.  Maybe something
-like 'git gc --aggressive' will be implemented in the future though..)
-So i decided to switch over to git(1) *everywhere*, even if it will
-require time to learn about it in detail.
-
-For SymObj.pm this means that there is an old public repository on
-BitBucket (https://bitbucket.org/sdaoden/symobj).  This will be
-supported as long as BitBucket doesn't throw away the repo!  That repo
-will effectively reflect the git(1) "master" branch.  (Luckily hg(1)
-supports patch series produced by "git format-patch --no-stat".)
-And then there is the git(1) repo mentioned above.
-
-P.S. (2011-09-22): i temporarily had the opinion that using
-"Signed-off-by:" lines are a good thing to have.
-I apologize.
