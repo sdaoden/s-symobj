@@ -1,7 +1,7 @@
 #@ (S-)Sym(bolic)Obj(ect) - easy creation of classes and objects thereof.
 package SymObj;
 require 5.008;
-$VERSION = '0.5.1';
+$VERSION = '0.6.0a';
 $COPYRIGHT =<<_EOT;
 Copyright (c) 2010 - 2012 Steffen Daode Nurpmeso <sdaoden\@users.sf.net>.
 All rights reserved.
@@ -42,12 +42,12 @@ sub pack_exists {
 
 sub sym_create {
    my ($pkg, $tfields) = @_;
-   my $exlist = (@_ > 2) ? $_[2] : undef;
    print STDERR "SymObj::sym_create(): $pkg\n" if $SymObj::Verbose;
 
    # Minimize code-blow - offer some basic SymObj symtable entries.
    # Even that is overkill unless the %FIELDS really require that though.
-   # The fun's @_ is always GT 0
+   # Since we use these also for management tasks, then, do inject regardless
+   # of wether the symbols are public or not.
    my $i = 0;
    foreach my $datum (keys %$tfields) {
       if (ref $tfields->{$datum} eq 'ARRAY') {
@@ -64,6 +64,8 @@ sub sym_create {
       *{"${pkg}::_SymObj_ArraySet"} = sub {
          my ($self, $pub, $datum) = (shift, shift, shift);
          my $dref = $self->{$datum};
+         # (Owed to lazy construction order)
+         $dref = $self->{$datum} = [] unless defined $dref;
 
          foreach my $arg (@_) {
             if (ref $arg eq 'ARRAY') {
@@ -87,6 +89,8 @@ sub sym_create {
       *{"${pkg}::_SymObj_HashSet"} = sub {
          my ($self, $pub, $datum) = (shift, shift, shift);
          my $dref = $self->{$datum};
+         # (Owed to lazy construction order)
+         $dref = $self->{$datum} = {} unless defined $dref;
 
          my $k = undef;
          foreach my $arg (@_) {
@@ -135,18 +139,33 @@ sub sym_create {
       }
    }
 
-jOUTER:
+   # We need a pointer to the fields for the constructor - overtake ownership
+   *{"${pkg}::_SymObj_Fields"} = $tfields;
+
    # Create accessor symtable entries
+   my @dellist;
    foreach my $datum (keys %$tfields) {
-      my $pub = $datum;
-      $pub = substr($pub, 1) if (0 == index $pub, '_');
+      my ($xdatum, $pub) = ($datum, $datum);
+      my ($isex) = (0);
+
+      # Don't create accessor subs?
+      if ($pub =~ /^\?/o) {
+         $isex = 1;
+         $xdatum =
+         $pub = substr($pub, 1);
+         push @dellist, [$datum, $xdatum];
+      }
+
+      if ($pub =~ /^_/) {
+         $pub = substr($pub, 1);
+      } elsif ($SymObj::Verbose) {
+         print STDERR "\tSymbol '$pub': does NOT start with underscore _!\n";
+      }
       $socargs{$pub} = $pub;
 
-      foreach (@$exlist) {
-         if ($pub eq $_) {
-            print STDERR "\tSymbol '$pub' excluded\n" if $SymObj::Verbose;
-            next jOUTER;
-         }
+      if ($isex) {
+         print STDERR "\tSymbol '$pub' excluded\n" if $SymObj::Verbose;
+         next;
       }
 
       if (ref $tfields->{$datum} eq 'ARRAY') {
@@ -155,8 +174,8 @@ jOUTER:
             my $self = $_[0];
             if (ref $self) { shift; }
             else           { $self = $tfields; }
-            $self = ((@_ == 0) ? $self->{$datum}
-                   : "${pkg}::_SymObj_ArraySet"->($self,$pub,$datum,@_));
+            $self = ((@_ == 0) ? $self->{$xdatum}
+                   : "${pkg}::_SymObj_ArraySet"->($self, $pub, $xdatum, @_));
             return wantarray ? @$self : $self;
          };
       } elsif (ref $tfields->{$datum} eq 'HASH') {
@@ -165,8 +184,8 @@ jOUTER:
             my $self = $_[0];
             if (ref $self) { shift; }
             else           { $self = $tfields; }
-            $self = ((@_ == 0) ? $self->{$datum}
-                   : "${pkg}::_SymObj_HashSet"->($self, $pub,$datum,@_));
+            $self = ((@_ == 0) ? $self->{$xdatum}
+                   : "${pkg}::_SymObj_HashSet"->($self, $pub, $xdatum, @_));
             return wantarray ? %$self : $self;
          };
       } else {
@@ -175,10 +194,16 @@ jOUTER:
             my $self = $_[0];
             if (ref $self) { shift; }
             else           { $self = $tfields; }
-            $self->{$datum} = shift if @_;
-            return $self->{$datum};
+            $self->{$xdatum} = shift if @_;
+            return $self->{$xdatum};
          };
       }
+   }
+
+   # Finally refcopy all those fields which end up without a special prefix
+   foreach my $l (@dellist) {
+      $tfields->{$l->[1]} = $tfields->{$l->[0]};
+      delete $tfields->{$l->[0]};
    }
 }
 
@@ -191,8 +216,8 @@ sub sym_dump {
 }
 
 sub obj_ctor {
-   my ($pkg, $class, $tfields, $argaref) = @_;
-   my $over = (@_ > 4) ? $_[4] : undef;
+   my ($pkg, $class, $argaref) = @_;
+   my $over = (@_ > 3) ? $_[3] : undef;
    print STDERR "SymObj::obj_ctor <> new: $pkg called as $class\n"
       if $SymObj::Verbose;
 
@@ -248,26 +273,6 @@ jOVER_OUTER:
    $self = {} unless defined $self;
    $self = bless $self, $class;
 
-   # Default field(-value)s.
-   # By default anon-hashes and -arrays get reference-copied;
-   # we however *do* need a detached (deep) copy!
-   while (my ($k, $v) = each %$tfields) {
-      unless (ref $v) {
-         $self->{$k} = $v;
-      } elsif (ref $v eq 'ARRAY') {
-         my @a;
-         push(@a, $_) foreach (@$v);
-         $self->{$k} = \@a;
-      } elsif (ref $v eq 'HASH') {
-         my (%h, $hk, $hv);
-         while (($hk, $hv) = each %$v) { $h{$hk} = $hv; }
-         $self->{$k} = \%h;
-      } elsif ($SymObj::Debug) {
-         print STDERR "${pkg}: $class->new(): value of '$k' has an ",
-            "unsupported type!\n";
-      }
-   }
-
    # Normal arguments; can and should we perform argument checking?
    $over = undef;
    if ($SymObj::Debug) {
@@ -281,6 +286,9 @@ jOVER_OUTER:
          }
       }
    }
+
+   # We need the per-class template member fields for comparison plus
+   my $tfields = *{"${pkg}::_SymObj_Fields"};
 
    # Use generic internal accessor (public ones may be excluded..)
    for (my $i = -1; $argc > 1; $argc -= 2) {
@@ -304,6 +312,27 @@ jOVER_OUTER:
          $self->_SymObj_HashSet('new()', $pk, $v);
       } else {
          $self->{$pk} = $v;
+      }
+   }
+
+   # Finally: fill in yet unset members of $self via the per-class template
+   # By default anon-hashes and -arrays get reference-copied;
+   # we however *do* need a detached (deep) copy!
+   while (my ($k, $v) = each %$tfields) {
+      next if exists $self->{$k};
+      unless (ref $v) {
+         $self->{$k} = $v;
+      } elsif (ref $v eq 'ARRAY') {
+         my @a;
+         push(@a, $_) foreach (@$v);
+         $self->{$k} = \@a;
+      } elsif (ref $v eq 'HASH') {
+         my (%h, $hk, $hv);
+         while (($hk, $hv) = each %$v) { $h{$hk} = $hv; }
+         $self->{$k} = \%h;
+      } elsif ($SymObj::Debug) {
+         print STDERR "${pkg}: $class->new(): value of '$k' has an ",
+            "unsupported type!\n";
       }
    }
 
@@ -342,16 +371,21 @@ C<git.code.sf.net/p/ssymobj/code>.
 
 =head2 Usage example
 
-   BEGIN { require 'SymObj.pm'; }
+   BEGIN {
+      require 'SymObj.pm';       
+      $SymObj::Verbose = 1;
+      #$SymObj::Debug = 0;
+   }
 
    {package X_Super;
-      my %Fields;
       BEGIN {
-         %Fields = (_name => '', _array => [], _hash => {} );
-         SymObj::sym_create(__PACKAGE__, \%Fields);
+         SymObj::sym_create(__PACKAGE__, {
+            _name => '', _array => [qw(av1 av2)],
+            _hash => {hk1 => 'hv1', hk2 => 'hv2'}
+         });
       }
 
-      sub new { SymObj::obj_ctor(__PACKAGE__, shift, \%Fields, \@_); }
+      sub new { SymObj::obj_ctor(__PACKAGE__, shift, \@_); }
    }
 
    {package SomePack;
@@ -361,7 +395,7 @@ C<git.code.sf.net/p/ssymobj/code>.
          SymObj::sym_create(__PACKAGE__, {}); # <- adds no fields on its own
       }
 
-      sub new { SymObj::obj_ctor(__PACKAGE__, shift, {}, \@_); } # <- ..
+      sub new { SymObj::obj_ctor(__PACKAGE__, shift, \@_); }
    }
 
    my $sp = SomePack->new(name => 'SymObj is easy', 'unknown' => 'arg');
@@ -381,26 +415,32 @@ C<git.code.sf.net/p/ssymobj/code>.
    print "name is <$v>\n";
 
    my $vr;
-   $vr = $sp->array( '1_1'); $sp->array('2_1');
-   $vr = $sp->array(qw( 1_2            2_2));
-   $vr = $sp->array([qw(1_3            2_3)]);
-   $vr = $sp->array( '1_4' =>       '2_4');
+   $vr = $sp->array(   '1_1'); $sp->array('2_1');
+   $vr = $sp->array(qw( 1_2                2_2));
+   $vr = $sp->array([qw(1_3                2_3)]);
+   $vr = $sp->array(   '1_4' =>           '2_4');
    my @arrcopy = $sp->array(); # wantarray context gives copy instead
 
-   $vr = $sp->hash(  i_1 => 'you',  we_1 => 'all');
+   $vr = $sp->hash(    i_1 => 'you',  we_1 => 'all');
    $vr = $sp->hash(   'i_2',  'you', 'we_2',  'all');
-   $vr = $sp->hash(qw( i_3    you    we_3    all));
-   $vr = $sp->hash([qw(i_4    you    we_4    all)]);
-   $vr = $sp->hash({ i_5 => 'you',  we_5 => 'all'});
+   $vr = $sp->hash(qw( i_3    you     we_3     all));
+   $vr = $sp->hash([qw(i_4    you     we_4     all)]);
+   $vr = $sp->hash({   i_5 => 'you',  we_5 => 'all'});
    my %hashcopy = $sp->hash(); # wantarray context gives copy instead
 
+   SymObj::obj_dump($sp);
+
+   # Adjust the per-class template
+   undef %{X_Super::hash()};
+   X_Super::hash(newhk1=>'newhv1', newhk2=>'newhv2');
+   $sp = SomePack->new(name => 'SymObj is really easy');
    SymObj::obj_dump($sp);
 
 =head2 Package-Symbols
 
 =over
 
-=item C<$SymObj::VERSION> (string, i.e., '0.6.0')
+=item C<$SymObj::VERSION> (string, i.e., '0.6.0a')
 
 A version string.
 
@@ -423,19 +463,20 @@ By default disabled.
 
 Check wether the class (package) $1 exists.
 
-=item C<sym_create($1=string=package, $2=hash-ref=fields, [$3=list=exlusion])>
+=item C<sym_create($1=string=package, $2=hash-ref=fields)>
 
 Create accessor methods/functions in the C<__PACKAGE__> C<$1>
 for all keys of C<$2>
 I<and> do some more magic symbol table housekeeping to make SymObj work.
-All (public) symbols of C<$3>, if given, will be skipped.
 Due to the additional magic this must be called even if no fields exist,
 yet even if C<$2> is the empty anonymous C<{}> hash (as shown above).
 
+Note that C<$2> is internally mirrored, but I<not> deep copied.
+It should be assumed that ownership of C<$2> is overtaken by S-SymObj.
+
 SymObj generally "enforces" privacy (by definition) via an underscore prefix:
 all keys of C<$2> are expected to start with an underscore,
-but the public accessor methods will miss that (C<_data> gets C<data>).
-The exclusion list C<$3> is expected to name public symbols instead.
+but the public accessor methods will miss that (C<_data> becomes C<data>).
 
 The created accessor subs work as methods if a C<$self> object exists
 (as in C<$self-E<gt>name()>) and as functions otherwise (C<SomePack::name()>),
@@ -443,19 +484,23 @@ in which case the provided package template hash (C<$2>) is used!
 (Note that no locking is performed in the latter case, i.e., this should
 not be done in multithreaded programs.)
 
+If keys in C<$2> are prefixed with a question mark, as in C<'?_name'>,
+then this means that no accessor sub will be created for C<name>.
+The mark will be stripped internally, i.e., the member is C<_name>, as
+expected, and that's also the way it is handled otherwise.
+
 =item C<sym_dump($1=string OR object=symbol table target)>
 
 Dump the symbol table entries of the package or object C<$1>.
 
-=item C<obj_ctor($1=string=package, $2=$self=class, $3=hash-ref=fields, $4=array-ref=arguments, [$5=hash-ref=overrides])>
+=item C<obj_ctor($1=string=package, $2=$self=class, $3==array-ref=arguments, [$4=hash-ref=overrides])>
 
 Create self (and it's superclass-instances).
-C<$3> is the very same hash as above for C<sym_create> and
-C<$4> is C<\@_>, i.e., the reference to the ctors own arguments.
-The optional C<$5> argument is only required if the class has superclasses
+C<$3> I<is> C<\@_>, i.e., the reference to the ctors own arguments.
+The optional C<$4> argument is only required if the class has superclasses
 and needs to regulary override some of the values of these;
 it is a hash which defines the key/value tuples to be overwritten:
-these will be merged into C<$4> if, and only if, they are not yet contained
+these will be merged into C<$3> if, and only if, they are not yet contained
 therein; note that the hash is ignored unless there really is a C<@ISA>,
 and that it's keys must refer to public names.
 

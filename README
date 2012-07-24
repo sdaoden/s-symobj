@@ -1,99 +1,131 @@
 S-SymObj
 ========
 
-Copyright (c) 2010 - 2012 Steffen Daode Nurpmeso <sdaoden@users.sf.net>.
-All rights reserved.
-See the file SymObj.pm for license information.
-Have fun.
+:Author:    Steffen Daode Nurpmeso
+:Contact:   sdaoden@users.sf.net
+:Date:      2010 - 2012
+:Copyright: All rights reserved under the terms of the ISC license.
+:Status:    Have fun.
 
-SymObj.pm provides an easy way to create and construct symbol-tables and
-objects.  With a simple hash one defines class-fields an object should
-have.  A generic constructor will then create the object and all of its
-superclasses, checking and filtering arguments along the way, which
-makes it pretty useful in times when the interface is unstable.  The
-generated accessor subs which are created for arrays and hashes
-implement a *feed in and forget* approach, since they can handle all
-kinds of arguments (or try it); this is also true for the constructor.
+SymObj.pm provides an easy way to create and construct symbol-tables
+and objects.  With a simple hash one defines class-fields an object
+should have.  A generic constructor will then create the object and
+all of its superclasses, checking and filtering arguments along the
+way, which makes it pretty useful in times when the interface is
+unstable.  The generated accessor subs which are created for arrays
+and hashes implement a *feed in and forget* approach, since they can
+handle all kinds of arguments (or try it); this is also true for the
+constructor.
 
-SymObj.pm works for Multiple-Inheritance as good as perl(1) allows.
-(That is to say that only one straight object tree can used,
-further trees of @ISA need to be joined in, say.)
-It should integrate neatlessly into SMP in respect to objects;
-package "static-data" however is not protected.
+SymObj.pm works for Multiple-Inheritance as good as `perl(1)`_ allows.
+(That is to say that only one straight object tree can used, further
+trees of ``@ISA`` need to be joined into the $self hash and thus loose
+*their* $self along the way, of course.) It should integrate neatlessly
+into SMP in respect to objects; package "static-data" however is not
+protected.
+
+   .. _`perl(1)`: http://www.perl.org
 
 S-SymObj is located at https://sourceforge.net/projects/ssymobj;
 it is developed using a git(1) repository, which is located at
 git.code.sf.net/p/ssymobj/code.
 
 
+WARNING
+-------
+
+2012-07-24, tag v0.6.0a
+   The interface was changed *incompatibly* to allow for much more
+   convenient usage and upward compatibility with possibly upcoming
+   changes.  If you knew S-SymObj, please reread the documentation.
+   But in short: the member ``%FIELDS`` are no longer necessary for
+   the constructor, only the class creator.  (But note that S-SymObj
+   now keeps an internal reference to accomplish that.)  And no more
+   exclusion lists have to be used, but instead exclusion is specified
+   by prefixing the member name in the ``%FIELDS`` array.
+
+
 Installation
 ------------
 
-SymObj.pm is a Perl module.  It should be in @INC.
-To start off, simply place it in the directory in which the perl(1)
-script which shall use it resides.
+SymObj.pm is a Perl module.  It should be in ``@INC``.  To start off,
+simply place it in the directory in which the `perl(1)`_ script which
+shall use it resides.
 
 
 Usage
 -----
 
 Please use the pod2XY family of programs for the complete and
-up-to-date documentation on SymObj.pm, e.g.
+up-to-date documentation on SymObj.pm, e.g., ::
 
     pod2text SymObj.pm
 
-The example from the documentation as of 2011-10-21:
+The example from the documentation as of 2012-07-24: ::
 
-    BEGIN { require 'SymObj.pm'; }
+   BEGIN {
+      require 'SymObj.pm';       
+      $SymObj::Verbose = 1;
+      #$SymObj::Debug = 0;
+   }
 
-    {package X_Super;
-        my %Fields;
-        BEGIN {
-            %Fields = (_name => '', _array => [], _hash => {} );
-            SymObj::sym_create(__PACKAGE__, \%Fields);
-        }
+   {package X_Super;
+      BEGIN {
+         SymObj::sym_create(__PACKAGE__, {
+            _name => '', _array => [qw(av1 av2)],
+            _hash => {hk1 => 'hv1', hk2 => 'hv2'}
+         });
+      }
 
-        sub new { SymObj::obj_ctor(__PACKAGE__, shift, \%Fields, \@_); }
-    }
+      sub new { SymObj::obj_ctor(__PACKAGE__, shift, \@_); }
+   }
 
-    {package SomePack;
-        our (@ISA);
-        BEGIN {
-            @ISA = ('X_Super');
-            SymObj::sym_create(__PACKAGE__, {}); # <- adds no fields on its own
-        }
+   {package SomePack;
+      our (@ISA);
+      BEGIN {
+         @ISA = ('X_Super');
+         SymObj::sym_create(__PACKAGE__, {}); # <- adds no fields on its own
+      }
 
-        sub new { SymObj::obj_ctor(__PACKAGE__, shift, {}, \@_); } # <- ..
-    }
+      sub new { SymObj::obj_ctor(__PACKAGE__, shift, \@_); }
+   }
 
-    my $sp = SomePack->new(name => 'SymObj is easy', 'unknown' => 'arg');
+   my $sp = SomePack->new(name => 'SymObj is easy', 'unknown' => 'arg');
 
-    # Other possible ctor arguments to init ->array() and ->hash()
-    # array => '1' # (Need to push the rest later on)
-    # array => ['1', '2', '3', '4']
-    # array => [qw(1 2 3 4)]
-    # array => {1 => '2', 3 => '4'}
-    # hash => [qw(i you we all)]
-    # hash => {i => 'you', we => 'all'}
+   # Other possible ctor arguments to init ->array() and ->hash()
+   # array => '1' # (Need to push the rest later on)
+   # array => ['1', '2', '3', '4']
+   # array => [qw(1 2 3 4)]
+   # array => {1 => '2', 3 => '4'}
+   # hash => [qw(i you we all)]
+   # hash => {i => 'you', we => 'all'}
 
-    # The accessor subs also try to swallow everything.
-    # They return references, except for scalars (always) and in wantarray
-    # context, in which case you get a copy
-    my $v = $sp->name('SymObj is really nice to use');
-    print "name is <$v>\n";
+   # The accessor subs also try to swallow everything.
+   # They return references, except for scalars (always) and in wantarray
+   # context, in which case you get a copy
+   my $v = $sp->name('SymObj is really nice to use');
+   print "name is <$v>\n";
 
-    my $vr;
-    $vr = $sp->array(   '1_1'); $sp->array('2_1');
-    $vr = $sp->array(qw( 1_2                2_2));
-    $vr = $sp->array([qw(1_3                2_3)]);
-    $vr = $sp->array(   '1_4' =>           '2_4');
-    my @arrcopy = $sp->array(); # wantarray context gives copy instead
+   my $vr;
+   $vr = $sp->array(   '1_1'); $sp->array('2_1');
+   $vr = $sp->array(qw( 1_2                2_2));
+   $vr = $sp->array([qw(1_3                2_3)]);
+   $vr = $sp->array(   '1_4' =>           '2_4');
+   my @arrcopy = $sp->array(); # wantarray context gives copy instead
 
-    $vr = $sp->hash(    i_1 => 'you',  we_1 => 'all');
-    $vr = $sp->hash(   'i_2',  'you', 'we_2',  'all');
-    $vr = $sp->hash(qw( i_3     you    we_3     all));
-    $vr = $sp->hash([qw(i_4     you    we_4     all)]);
-    $vr = $sp->hash({   i_5 => 'you',  we_5 => 'all'});
-    my %hashcopy = $sp->hash(); # wantarray context gives copy instead
+   $vr = $sp->hash(    i_1 => 'you',  we_1 => 'all');
+   $vr = $sp->hash(   'i_2',  'you', 'we_2',  'all');
+   $vr = $sp->hash(qw( i_3    you     we_3     all));
+   $vr = $sp->hash([qw(i_4    you     we_4     all)]);
+   $vr = $sp->hash({   i_5 => 'you',  we_5 => 'all'});
+   my %hashcopy = $sp->hash(); # wantarray context gives copy instead
 
-    SymObj::obj_dump($sp);
+   SymObj::obj_dump($sp);
+
+   # Adjust the per-class template
+   undef %{X_Super::hash()};
+   X_Super::hash(newhk1 => 'newhv1', newhk2 => 'newhv2');
+   $sp = SomePack->new(name => 'SymObj is really easy');
+   SymObj::obj_dump($sp);
+
+.. vim:set fenc=utf-8 filetype=rst syntax=rst ts=3 sts=3 sw=3 et tw=75:
