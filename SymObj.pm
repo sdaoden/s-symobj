@@ -145,8 +145,7 @@ sub sym_create {
    # Create accessor symtable entries
    my @dellist;
    foreach my $datum (keys %$tfields) {
-      my ($xdatum, $pub) = ($datum, $datum);
-      my ($isex) = (0);
+      my ($xdatum, $pub, $isex) = ($datum, $datum, 0);
 
       # Don't create accessor subs?
       if ($pub =~ /^\?/o) {
@@ -164,7 +163,8 @@ sub sym_create {
       $socargs{$pub} = $pub;
 
       if ($isex) {
-         print STDERR "\tSymbol '$pub' excluded\n" if $SymObj::Verbose;
+         print STDERR "\tExclusion: not creating accessors for '$pub'\n"
+            if $SymObj::Verbose;
          next;
       }
 
@@ -221,16 +221,14 @@ sub obj_ctor {
    print STDERR "SymObj::obj_ctor <> new: $pkg called as $class\n"
       if $SymObj::Verbose;
 
-   my ($self, $argc, $init_chain) = (undef, scalar @$argaref, 0);
+   my ($self, $argc) = (undef, scalar @$argaref);
 
    # Since all classes use obj_ctor in their new, we would perform argument
    # checking over and over again; so use a savage and hacky, but
    # multithread-safe way to perform argument checking only in the ctor of
    # the real (actual sub-) class
-   if ($SymObj::Debug && $argc > 0 &&
-         defined $argaref->[0] && $argaref->[0] eq _UUID) {
-      $init_chain = 1;
-   }
+   my $init_chain = ($SymObj::Debug && $argc > 0 &&
+                     defined $argaref->[0] && $argaref->[0] eq _UUID);
 
    # Inheritance handling
    if (defined(my $isa = *{"${pkg}::ISA"})) {
@@ -246,7 +244,7 @@ jOVER_OUTER:
 
       # Walk the new() chain,
       # but disallow arg-checking for superclasses
-      unshift(@$argaref, _UUID) if ($SymObj::Debug && !$init_chain);
+      unshift(@$argaref, _UUID) if $SymObj::Debug && ! $init_chain;
 
       foreach (@$isa) {
          my $sym = "${_}::new";
@@ -266,7 +264,7 @@ jOVER_OUTER:
          while (my ($k, $v) = each %$sym) { $self->{$k} = $v; }
       }
 
-      shift @$argaref if ($SymObj::Debug && !$init_chain);
+      shift @$argaref if $SymObj::Debug && ! $init_chain;
    }
 
    # SELF
@@ -280,7 +278,7 @@ jOVER_OUTER:
          shift @$argaref;
       } else {
          $over = *{"${pkg}::_SymObj_AllCTorArgs"};
-         if (($argc & 1) != 0) {
+         if ($argc & 1) {
             --$argc;
             print STDERR "${pkg}: $class->new(): odd argument discarded!\n"
          }
@@ -315,7 +313,7 @@ jOVER_OUTER:
       }
    }
 
-   # Finally: fill in yet unset members of $self via the per-class template
+   # Finally: fill in yet unset members of $self via the per-class template.
    # By default anon-hashes and -arrays get reference-copied;
    # we however *do* need a detached (deep) copy!
    while (my ($k, $v) = each %$tfields) {
