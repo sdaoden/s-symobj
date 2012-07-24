@@ -45,59 +45,78 @@ sub sym_create {
    my $exlist = (@_ > 2) ? $_[2] : undef;
    print STDERR "SymObj::sym_create(): $pkg\n" if $SymObj::Verbose;
 
-   # Minimize code-blow - offer some basic SymObj symtable entries
-   # @_ always GT 0
-   *{"${pkg}::_SymObj_ArraySet"} = sub {
-      my ($self, $pub, $datum) = (shift, shift, shift);
-      my $dref = $self->{$datum};
-
-      foreach my $arg (@_) {
-         if (ref $arg eq 'ARRAY') {
-            push(@$dref, $_) foreach (@$arg);
-         } elsif (ref $arg eq 'HASH') {
-            while (my ($k, $v) = each %$arg) {
-               push @$dref, $k;
-               push @$dref, $v;
-            }
-         } else {
-            push @$dref, $arg;
-         }
+   # Minimize code-blow - offer some basic SymObj symtable entries.
+   # Even that is overkill unless the %FIELDS really require that though.
+   # The fun's @_ is always GT 0
+   my $i = 0;
+   foreach my $datum (keys %$tfields) {
+      if (ref $tfields->{$datum} eq 'ARRAY') {
+         $i |= 1;
+         last if ($i & 3) == 3;
+      } elsif (ref $tfields->{$datum} eq 'HASH') {
+         $i |= 2;
+         last if ($i & 3) == 3;
       }
+   }
+   if ($i & 1) {
+      print STDERR "SymObj::sym_create(): $pkg: adding shared array handler\n"
+         if $SymObj::Verbose;
+      *{"${pkg}::_SymObj_ArraySet"} = sub {
+         my ($self, $pub, $datum) = (shift, shift, shift);
+         my $dref = $self->{$datum};
 
-      return $dref;
-   };
-   *{"${pkg}::_SymObj_HashSet"} = sub {
-      my ($self, $pub, $datum) = (shift, shift, shift);
-      my $dref = $self->{$datum};
-
-      my $k = undef;
-      foreach my $arg (@_) {
-         if (defined $k) {
-            $dref->{$k} = $arg;
-            $k = undef;
-            next;
-         }
-         if (ref $arg eq 'HASH') {
-            while (my ($k, $v) = each %$arg) {
-               $dref->{$k} = $v;
+         foreach my $arg (@_) {
+            if (ref $arg eq 'ARRAY') {
+               push(@$dref, $_) foreach (@$arg);
+            } elsif (ref $arg eq 'HASH') {
+               while (my ($k, $v) = each %$arg) {
+                  push @$dref, $k;
+                  push @$dref, $v;
+               }
+            } else {
+               push @$dref, $arg;
             }
-         } elsif (ref $arg eq 'ARRAY') {
-            while (@$arg > 1) {
-               my $v = pop @$arg;
-               my $k = pop @$arg;
-               $dref->{$k} = $v;
-            }
-            print STDERR "! ${pkg}::${pub}(): wrong array member count!\n"
-               if (@$arg != 0 && $SymObj::Debug);
-         } else {
-            $k = $arg;
          }
-      }
-      print STDERR "! ${pkg}::${pub}(): '$k' key without a value\n"
-         if (defined $k && $SymObj::Debug);
 
-      return $dref;
-   };
+         return $dref;
+      };
+   }
+   if ($i & 2) {
+      print STDERR "SymObj::sym_create(): $pkg: adding shared hash handler\n"
+         if $SymObj::Verbose;
+      *{"${pkg}::_SymObj_HashSet"} = sub {
+         my ($self, $pub, $datum) = (shift, shift, shift);
+         my $dref = $self->{$datum};
+
+         my $k = undef;
+         foreach my $arg (@_) {
+            if (defined $k) {
+               $dref->{$k} = $arg;
+               $k = undef;
+               next;
+            }
+            if (ref $arg eq 'HASH') {
+               while (my ($k, $v) = each %$arg) {
+                  $dref->{$k} = $v;
+               }
+            } elsif (ref $arg eq 'ARRAY') {
+               while (@$arg > 1) {
+                  my $v = pop @$arg;
+                  my $k = pop @$arg;
+                  $dref->{$k} = $v;
+               }
+               print STDERR "! ${pkg}::${pub}(): wrong array member count!\n"
+                  if (@$arg != 0 && $SymObj::Debug);
+            } else {
+               $k = $arg;
+            }
+         }
+         print STDERR "! ${pkg}::${pub}(): '$k' key without a value\n"
+            if (defined $k && $SymObj::Debug);
+
+         return $dref;
+      };
+   }
 
    # For (superior debug ctor) argument checking, create a hash of
    # public symbols (inherit those of parents first ...)
