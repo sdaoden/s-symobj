@@ -348,26 +348,32 @@ sub obj_dump {
 1;
 __END__
 
+
 =head1 S-SymObj
 
-SymObj.pm provides an easy way to create and construct symbol-tables and
-objects.  With a simple hash one defines class-fields an object should
-have.  A generic constructor will then create the object and all of its
-superclasses, checking and filtering arguments along the way, which
-makes it pretty useful in times when the interface is unstable.
-The generated accessor subs which are created for arrays and hashes
-implement a B<feed in and forget> approach, since they can handle all
-kinds of arguments (or try it); this is also true for the constructor.
+SymObj.pm provides an easy way to create and construct symbol-tables
+and objects.  With a simple hash one defines class-fields an object
+should have.  A generic constructor will then create the object and
+all of its superclasses, checking and filtering arguments along the
+way, which makes it pretty useful in times when the interface is
+unstable.  The generated accessor subs which are created for arrays
+and hashes implement a I<feed in and forget> approach, since they can
+handle all kinds of arguments (or try it); this is also true for the
+constructor.
 
 SymObj.pm works for Multiple-Inheritance as good as perl(1) allows.
-(That is to say that only one straight object tree can used,
-further trees of C<@ISA> need to be joined in, say.)
-It should integrate neatlessly into SMP in respect to objects;
-package "static-data" however is not protected.
+(That is to say that only one straight object tree can be used, further
+trees of C<@ISA> need to be joined into the C<$self> hash and thus
+loose I<their> C<$self> along the way, of course.)  It should integrate
+neatlessly into SMP in respect to objects; package "static-data" however
+is not protected.
 
-S-SymObj is located at L<https://sourceforge.net/projects/ssymobj>;
-it is developed using a git(1) repository, which is located at
-C<git.code.sf.net/p/ssymobj/code>.
+The S-SymObj project is located at
+L<https://sourceforge.net/projects/ssymobj>; since that is a SourceForge
+Beta project page, L<http://sdaoden.users.sourceforge.net/code.html>
+is maybe more interesting.  S-SymObj is developed using a git(1)
+repository, which is located at C<git.code.sf.net/p/ssymobj/code>.
+
 
 =head2 Usage example
 
@@ -436,6 +442,7 @@ C<git.code.sf.net/p/ssymobj/code>.
    $sp = SomePack->new(name => 'SymObj is really easy');
    SymObj::obj_dump($sp);
 
+
 =head2 Package-Symbols
 
 =over
@@ -448,13 +455,13 @@ A version string.
 
 Copyright multiline string, formatted for pretty printing.
 
-=item C<$SymObj::Debug> (boolean, i.e., 0 or xy, default 1)
+=item C<$SymObj::Debug> (boolean, i.e., 0 or 1, default 1)
 
 Indicates wether some checks etc. shall be performed or not.
 By default enabled.
 Messages go to STDERR.
 
-=item C<$SymObj::Verbose> (boolean, i.e., 0 or xy, default 0)
+=item C<$SymObj::Verbose> (boolean, i.e., 0 or 1, default 0)
 
 If enabled some more informational etc. messages go to STDERR.
 By default disabled.
@@ -474,35 +481,36 @@ yet even if C<$2> is the empty anonymous C<{}> hash (as shown above).
 Note that C<$2> is internally mirrored, but I<not> deep copied.
 It should be assumed that ownership of C<$2> is overtaken by S-SymObj.
 
-SymObj generally "enforces" privacy (by definition) via an underscore prefix:
-all keys of C<$2> are expected to start with an underscore,
-but the public accessor methods will miss that (C<_data> becomes C<data>).
+SymObj generally "enforces" privacy (by definition) via an underscore
+prefix: all keys of C<$2> are expected to start with an underscore,
+but the public accessor methods will miss that (C<_data> becomes
+C<data>).
 
 The created accessor subs work as methods if a C<$self> object exists
-(as in C<$self-E<gt>name()>) and as functions otherwise (C<SomePack::name()>),
-in which case the provided package template hash (C<$2>) is used!
-(Note that no locking is performed in the latter case, i.e., this should
-not be done in multithreaded programs.)
+(as in C<$self-E<gt>name()>) and as functions otherwise
+(C<SomePack::name()>), in which case the provided package template
+hash (C<$2>) is used!  (Note that no locking is performed in the latter
+case, i.e., this should not be done in multithreaded programs.)
 
 If keys in C<$2> are prefixed with a question mark, as in C<'?_name'>,
-then this means that no accessor sub will be created for C<name>.
-The mark will be stripped internally, i.e., the member is C<_name>, as
+then this means that no accessor sub will be created for C<name>.  The
+mark will be stripped internally, i.e., the member is C<_name>, as
 expected, and that's also the way it is handled otherwise.
 
 =item C<sym_dump($1=string OR object=symbol table target)>
 
 Dump the symbol table entries of the package or object C<$1>.
 
-=item C<obj_ctor($1=string=package, $2=$self=class, $3==array-ref=arguments, [$4=hash-ref=overrides])>
+=item C<obj_ctor($1=string=package, $2=$self=class, $3=array-ref=arguments, [$4=hash-ref=overrides])>
 
-Create self (and it's superclass-instances).
-C<$3> I<is> C<\@_>, i.e., the reference to the ctors own arguments.
-The optional C<$4> argument is only required if the class has superclasses
-and needs to regulary override some of the values of these;
-it is a hash which defines the key/value tuples to be overwritten:
-these will be merged into C<$3> if, and only if, they are not yet contained
-therein; note that the hash is ignored unless there really is a C<@ISA>,
-and that it's keys must refer to public names.
+Create self (and it's superclass-instances).  C<$3> I<is> C<@_>, i.e.,
+the reference to the ctors own arguments.  The optional C<$4> argument
+is only required if the class has superclasses and needs to regulary
+override some of the values of these; it is a hash which defines the
+key/value tuples to be overwritten: these will be merged into C<$3>
+if, and only if, they are not yet contained therein; note that the
+hash is ignored unless there really is a C<@ISA>, and that it's keys
+must refer to public names.
 
 =item C<obj_dump($1=$self)>
 

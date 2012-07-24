@@ -7,6 +7,8 @@ S-SymObj
 :Copyright: All rights reserved under the terms of the ISC license.
 :Status:    Have fun.
 
+.. _`perl(1)`: http://www.perl.org
+
 SymObj.pm provides an easy way to create and construct symbol-tables
 and objects.  With a simple hash one defines class-fields an object
 should have.  A generic constructor will then create the object and
@@ -18,17 +20,17 @@ handle all kinds of arguments (or try it); this is also true for the
 constructor.
 
 SymObj.pm works for Multiple-Inheritance as good as `perl(1)`_ allows.
-(That is to say that only one straight object tree can used, further
-trees of ``@ISA`` need to be joined into the $self hash and thus loose
-*their* $self along the way, of course.) It should integrate neatlessly
-into SMP in respect to objects; package "static-data" however is not
-protected.
+(That is to say that only one straight object tree can be used, further
+trees of ``@ISA`` need to be joined into the ``$self`` hash and thus
+loose *their* ``$self`` along the way, of course.)  It should integrate
+neatlessly into SMP in respect to objects; package "static-data" however
+is not protected.
 
-   .. _`perl(1)`: http://www.perl.org
-
-S-SymObj is located at https://sourceforge.net/projects/ssymobj;
-it is developed using a git(1) repository, which is located at
-git.code.sf.net/p/ssymobj/code.
+The S-SymObj project is located at
+https://sourceforge.net/projects/ssymobj; since that is a SourceForge
+Beta project page, http://sdaoden.users.sourceforge.net/code.html is
+maybe more interesting.  S-SymObj is developed using a git(1) repository,
+which is located at git.code.sf.net/p/ssymobj/code.
 
 
 WARNING
