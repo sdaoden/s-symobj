@@ -1,7 +1,7 @@
 S-SymObj
 ========
 
-:Author:    Steffen Daode Nurpmeso
+:Author:    Steffen "Daode" Nurpmeso
 :Contact:   sdaoden@users.sf.net
 :Date:      2010 - 2012
 :Copyright: All rights reserved under the terms of the ISC license.
@@ -50,9 +50,12 @@ WARNING
 Installation
 ------------
 
-SymObj.pm is a Perl module.  It should be in ``@INC``.  To start off,
-simply place it in the directory in which the `perl(1)`_ script which
-shall use it resides.
+SymObj.pm is a Perl module and therefore needs to be in ``@INC`` if
+scripts should be able to find it easily.  This can be accomplished
+by either copying SymObj.pm to one of the paths shown by ``$ perl -V``,
+or by specifying a path via the ``-I`` command line option, or by
+placing a path in the ``PERL5LIB`` environment variable.  The last
+solution is maybe the easiest one.
 
 
 Usage
