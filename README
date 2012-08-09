@@ -32,7 +32,6 @@ Beta project page, http://sdaoden.users.sourceforge.net/code.html is
 maybe more interesting.  S-SymObj is developed using a git(1) repository,
 which is located at git.code.sf.net/p/ssymobj/code.
 
-
 WARNING
 -------
 
@@ -46,7 +45,6 @@ WARNING
    exclusion lists have to be used, but instead exclusion is specified
    by prefixing the member name in the ``%FIELDS`` array.
 
-
 Installation
 ------------
 
@@ -56,7 +54,6 @@ by either copying SymObj.pm to one of the paths shown by ``$ perl -V``,
 or by specifying a path via the ``-I`` command line option, or by
 placing a path in the ``PERL5LIB`` environment variable.  The last
 solution is maybe the easiest one.
-
 
 Usage
 -----
@@ -133,4 +130,4 @@ The example from the documentation as of 2012-07-24: ::
    $sp = SomePack->new(name => 'SymObj is really easy');
    SymObj::obj_dump($sp);
 
-.. vim:set fenc=utf-8 filetype=rst syntax=rst ts=3 sts=3 sw=3 et tw=75:
+.. vim:set fenc=utf-8 filetype=rst syntax=rst ts=8 sts=3 sw=3 et tw=75:

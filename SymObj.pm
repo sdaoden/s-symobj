@@ -517,4 +517,4 @@ Dumper::dump.
 =back
 
 =cut
-# vim:set fenc=utf-8 filetype=perl syntax=perl ts=3 sts=3 sw=3 et tw=79:
+# vim:set fenc=utf-8 filetype=perl syntax=perl ts=8 sts=3 sw=3 et tw=79:
