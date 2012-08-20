@@ -1,10 +1,10 @@
 #@ (S-)Sym(bolic)Obj(ect) - easy creation of classes and objects thereof.
 package SymObj;
-require 5.008;
+require 5.008_001;
 $VERSION = '0.6.0b';
 $COPYRIGHT =<<_EOT;
-Copyright (c) 2010 - 2012 Steffen Daode Nurpmeso <sdaoden\@users.sf.net>.
-All rights reserved.
+Copyright (c) 2010 - 2012 Steffen "Daode" Nurpmeso <sdaoden\@users.sf.net>.
+All rights reserved under the terms of the ISC license.
 _EOT
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -18,21 +18,21 @@ _EOT
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-# Yeah, we fool around with that by definition, so this
+# We fool around with that by definition, so this
 no strict 'refs';
 
 BEGIN {
    #require Exporter;
    #@ISA = qw(Exporter);
    @EXPORT = qw(&pack_exists &sym_create &sym_dump
-               &obj_ctor &obj_dump
-               $VERSION $COPYRIGHT $Debug $Verbose);
+      &obj_ctor &obj_dump
+      $VERSION $COPYRIGHT $Debug $Verbose);
 }
 
 $Debug = 1;
 $Verbose = 0;
 
-sub _UUID { return 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD'; }
+sub _UUID { 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD'; }
 
 sub _complain_rdonly {
    return unless $SymObj::Verbose;
@@ -43,7 +43,7 @@ sub _complain_rdonly {
 # TODO pack_ series incomplete (available in eval?? require??)
 sub pack_exists {
    my ($pkg) = @_;
-   return defined %{"${pkg}::"};
+   defined %{"${pkg}::"};
 }
 
 sub sym_create {
@@ -65,8 +65,7 @@ sub sym_create {
       }
    }
    if ($i & 1) {
-      print STDERR "SymObj::sym_create(): $pkg: adding shared array handler\n"
-         if $SymObj::Verbose;
+      print STDERR "\t..adding shared array handler\n" if $SymObj::Verbose;
       *{"${pkg}::_SymObj_ArraySet"} = sub {
          my ($self, $pub, $datum) = (shift, shift, shift);
          my $dref = $self->{$datum};
@@ -85,13 +84,11 @@ sub sym_create {
                push @$dref, $arg;
             }
          }
-
-         return $dref;
+         $dref;
       };
    }
    if ($i & 2) {
-      print STDERR "SymObj::sym_create(): $pkg: adding shared hash handler\n"
-         if $SymObj::Verbose;
+      print STDERR "\t..adding shared hash handler\n" if $SymObj::Verbose;
       *{"${pkg}::_SymObj_HashSet"} = sub {
          my ($self, $pub, $datum) = (shift, shift, shift);
          my $dref = $self->{$datum};
@@ -116,15 +113,14 @@ sub sym_create {
                   $dref->{$k} = $v;
                }
                print STDERR "! ${pkg}::${pub}(): wrong array member count!\n"
-                  if (@$arg != 0 && $SymObj::Debug);
+                  if @$arg != 0 && $SymObj::Debug;
             } else {
                $k = $arg;
             }
          }
          print STDERR "! ${pkg}::${pub}(): '$k' key without a value\n"
-            if (defined $k && $SymObj::Debug);
-
-         return $dref;
+            if defined $k && $SymObj::Debug;
+         $dref;
       };
    }
 
@@ -158,15 +154,14 @@ sub sym_create {
       # Don't create accessor subs?  Provide only read-only access?
       if ($pub =~ /^\?/) {
          $type = TYPE_EXCLUDE;
-         $xdatum = $pub = substr $pub, 1;
          push @dellist, [$datum, $xdatum];
       } elsif ($pub =~ /^!/) {
          $type = TYPE_RDONLY;
-         $xdatum = $pub = substr $pub, 1;
       }
+      ($xdatum = $pub = substr $pub, 1) if $type != 0;
 
       if ($pub =~ /^_/) {
-         $pub = substr($pub, 1);
+         $pub = substr $pub, 1;
       } elsif ($SymObj::Debug) {
          print STDERR "\tSymbol '$pub': does NOT start with underscore _!\n";
       }
@@ -264,7 +259,7 @@ sub obj_ctor {
    # multithread-safe way to perform argument checking only in the ctor of
    # the real (actual sub-) class
    my $init_chain = ($SymObj::Debug && $argc > 0 &&
-                     defined $argaref->[0] && $argaref->[0] eq _UUID);
+      defined $argaref->[0] && $argaref->[0] eq _UUID);
 
    # Inheritance handling
    if (defined(my $isa = *{"${pkg}::ISA"})) {
@@ -370,7 +365,7 @@ jOVER_OUTER:
       }
    }
 
-   return $self;
+   $self;
 }
 
 sub obj_dump {
@@ -485,6 +480,7 @@ A version string.
 =item C<$SymObj::COPYRIGHT> (string)
 
 Copyright multiline string, formatted for pretty printing.
+S-SymObj is provided under the terms of the ISC license.
 
 =item C<$SymObj::Debug> (boolean, i.e., 0 or 1, default 1)
 
