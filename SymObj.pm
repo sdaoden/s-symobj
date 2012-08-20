@@ -34,6 +34,12 @@ $Verbose = 0;
 
 sub _UUID { return 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD'; }
 
+sub _complain_rdonly {
+   return unless $SymObj::Verbose;
+   my ($pkg, $pub) = @_;
+   print STDERR "${pkg}::$pub(): write access to readonly field rejected\n";
+}
+
 # TODO pack_ series incomplete (available in eval?? require??)
 sub pack_exists {
    my ($pkg) = @_;
@@ -145,14 +151,18 @@ sub sym_create {
    # Create accessor symtable entries
    my @dellist;
    foreach my $datum (keys %$tfields) {
-      my ($xdatum, $pub, $isex) = ($datum, $datum, 0);
+      sub TYPE_EXCLUDE  { 1<<0; }
+      sub TYPE_RDONLY   { 1<<1; }
+      my ($xdatum, $pub, $type) = ($datum, $datum, 0);
 
-      # Don't create accessor subs?
-      if ($pub =~ /^\?/o) {
-         $isex = 1;
-         $xdatum =
-         $pub = substr($pub, 1);
+      # Don't create accessor subs?  Provide only read-only access?
+      if ($pub =~ /^\?/) {
+         $type = TYPE_EXCLUDE;
+         $xdatum = $pub = substr $pub, 1;
          push @dellist, [$datum, $xdatum];
+      } elsif ($pub =~ /^!/) {
+         $type = TYPE_RDONLY;
+         $xdatum = $pub = substr $pub, 1;
       }
 
       if ($pub =~ /^_/) {
@@ -167,7 +177,7 @@ sub sym_create {
       *{"${pkg}::__$pub"} = ($i eq 'ARRAY' || $i eq 'HASH')
          ? sub { $_[0]->{$xdatum}; } : sub { \$_[0]->{$xdatum}; };
 
-      if ($isex) {
+      if ($type == TYPE_EXCLUDE) {
          print STDERR "\tExclusion: not creating accessors for '$pub'\n"
             if $SymObj::Verbose;
          next;
@@ -180,19 +190,31 @@ sub sym_create {
             my $self = $_[0];
             if (ref $self) { shift; }
             else           { $self = $tfields; }
-            $self = ((@_ == 0) ? $self->{$xdatum}
-               : "${pkg}::_SymObj_ArraySet"->($self, $pub, $xdatum, @_));
-            wantarray ? @$self : $self;
+            my $f = $self->{$xdatum};
+            if (@_ > 0) {
+               if ($type == TYPE_RDONLY) {
+                  SymObj::_complain_rdonly($pkg, $pub);
+               } else {
+                  $f = "${pkg}::_SymObj_ArraySet"->($self, $pub, $xdatum, @_);
+               }
+            }
+            wantarray ? @$f : $f;
          };
       } elsif ($i eq 'HASH') {
-         print STDERR "\tsub $pub: hash-based\n" if $SymObj::Verbose;
+         print STDERR "\tsub $pub: hash-based\n" if $SymObj::Debug;
          *{"${pkg}::$pub"} = sub {
             my $self = $_[0];
             if (ref $self) { shift; }
             else           { $self = $tfields; }
-            $self = ((@_ == 0) ? $self->{$xdatum}
-               : "${pkg}::_SymObj_HashSet"->($self, $pub, $xdatum, @_));
-            wantarray ? %$self : $self;
+            my $f = $self->{$xdatum};
+            if (@_ > 0) {
+               if ($type == TYPE_RDONLY) {
+                  SymObj::_complain_rdonly($pkg, $pub);
+               } else {
+                  $f = "${pkg}::_SymObj_HashSet"->($self, $pub, $xdatum, @_);
+               }
+            }
+            wantarray ? %$f : $f;
          };
       } else {
          # Scalar (or "typeless")
@@ -200,7 +222,13 @@ sub sym_create {
             my $self = $_[0];
             if (ref $self) { shift; }
             else           { $self = $tfields; }
-            $self->{$xdatum} = shift if @_;
+            if (@_ > 0) {
+               if ($type == TYPE_RDONLY) {
+                  SymObj::_complain_rdonly($pkg, $pub);
+               } else {
+                  $self->{$xdatum} = shift;
+               }
+            }
             $self->{$xdatum};
          };
       }
@@ -496,10 +524,15 @@ If they act upon arrays or hashs they'll return references to the
 members by default, but do return copies in C<wantarray> context
 instead.
 
-If keys in C<$2> are prefixed with a question mark, as in C<'?_name'>,
-then this means that no accessor sub will be created for C<name>.  The
+If a key in C<$2> is prefixed with a question mark, as in C<'?_name'>,
+then this means that no accessor subs will be created for C<name>.  The
 mark will be stripped internally, i.e., the member is C<_name>, as
 expected, and that's also the way it is handled otherwise.
+
+Just likewise, if a key in C<$2> are prefixed with an exclamation mark,
+as in C<'!_name'>, then there will only be a readonly accessor sub be
+made available.  Write access will be rejected, and also logged if
+C<$SymObj::Debug> is true.
 
 In addition to those accessor subs there will I<always> be private
 accessor subs be created which use the public name prefixed with two
