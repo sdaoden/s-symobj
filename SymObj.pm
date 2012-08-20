@@ -162,31 +162,37 @@ sub sym_create {
       }
       $socargs{$pub} = $pub;
 
+      # Always create a private accessor that returns a reference
+      $i = ref $tfields->{$datum};
+      *{"${pkg}::__$pub"} = ($i eq 'ARRAY' || $i eq 'HASH')
+         ? sub { $_[0]->{$xdatum}; } : sub { \$_[0]->{$xdatum}; };
+
       if ($isex) {
          print STDERR "\tExclusion: not creating accessors for '$pub'\n"
             if $SymObj::Verbose;
          next;
       }
 
-      if (ref $tfields->{$datum} eq 'ARRAY') {
+      # Instantiate 'em
+      if ($i eq 'ARRAY') {
          print STDERR "\tsub $pub: array-based\n" if $SymObj::Verbose;
          *{"${pkg}::$pub"} = sub {
             my $self = $_[0];
             if (ref $self) { shift; }
             else           { $self = $tfields; }
             $self = ((@_ == 0) ? $self->{$xdatum}
-                   : "${pkg}::_SymObj_ArraySet"->($self, $pub, $xdatum, @_));
-            return wantarray ? @$self : $self;
+               : "${pkg}::_SymObj_ArraySet"->($self, $pub, $xdatum, @_));
+            wantarray ? @$self : $self;
          };
-      } elsif (ref $tfields->{$datum} eq 'HASH') {
+      } elsif ($i eq 'HASH') {
          print STDERR "\tsub $pub: hash-based\n" if $SymObj::Verbose;
          *{"${pkg}::$pub"} = sub {
             my $self = $_[0];
             if (ref $self) { shift; }
             else           { $self = $tfields; }
             $self = ((@_ == 0) ? $self->{$xdatum}
-                   : "${pkg}::_SymObj_HashSet"->($self, $pub, $xdatum, @_));
-            return wantarray ? %$self : $self;
+               : "${pkg}::_SymObj_HashSet"->($self, $pub, $xdatum, @_));
+            wantarray ? %$self : $self;
          };
       } else {
          # Scalar (or "typeless")
@@ -195,7 +201,7 @@ sub sym_create {
             if (ref $self) { shift; }
             else           { $self = $tfields; }
             $self->{$xdatum} = shift if @_;
-            return $self->{$xdatum};
+            $self->{$xdatum};
          };
       }
    }
@@ -346,7 +352,6 @@ sub obj_dump {
 1;
 __END__
 
-
 =head1 S-SymObj
 
 SymObj.pm provides an easy way to create and construct symbol-tables
@@ -371,7 +376,6 @@ L<https://sourceforge.net/projects/ssymobj>; since that is a SourceForge
 Beta project page, L<http://sdaoden.users.sourceforge.net/code.html>
 is maybe more interesting.  S-SymObj is developed using a git(1)
 repository, which is located at C<git.code.sf.net/p/ssymobj/code>.
-
 
 =head2 Usage example
 
@@ -440,7 +444,6 @@ repository, which is located at C<git.code.sf.net/p/ssymobj/code>.
    $sp = SomePack->new(name => 'SymObj is really easy');
    SymObj::obj_dump($sp);
 
-
 =head2 Package-Symbols
 
 =over
@@ -489,11 +492,21 @@ The created accessor subs work as methods if a C<$self> object exists
 (C<SomePack::name()>), in which case the provided package template
 hash (C<$2>) is used!  (Note that no locking is performed in the latter
 case, i.e., this should not be done in multithreaded programs.)
+If they act upon arrays or hashs they'll return references to the
+members by default, but do return copies in C<wantarray> context
+instead.
 
 If keys in C<$2> are prefixed with a question mark, as in C<'?_name'>,
 then this means that no accessor sub will be created for C<name>.  The
 mark will be stripped internally, i.e., the member is C<_name>, as
 expected, and that's also the way it is handled otherwise.
+
+In addition to those accessor subs there will I<always> be private
+accessor subs be created which use the public name prefixed with two
+underscores, as in C<$self-E<gt>__name()>.  These subs do nothing
+except returning a reference to the field in question.  They're ment
+to be used instead of direct access of members in some contexts, i.e.,
+for encapsulation purposes.
 
 =item C<sym_dump($1=string OR object=symbol table target)>
 
