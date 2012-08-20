@@ -138,7 +138,7 @@ sub sym_create {
          my $socr = *{"${super}::_SymObj_AllCTorArgs"};
          unless (defined $socr) {
             print STDERR "! ${pkg}: \@ISA entry '$super' is not a SymObj ",
-               "managed class!\n";
+               "managed class!\n" if $SymObj::Debug;
             next;
          }
          $socargs{$_} = $_ foreach (keys %$socr);
@@ -167,7 +167,7 @@ sub sym_create {
 
       if ($pub =~ /^_/) {
          $pub = substr($pub, 1);
-      } elsif ($SymObj::Verbose) {
+      } elsif ($SymObj::Debug) {
          print STDERR "\tSymbol '$pub': does NOT start with underscore _!\n";
       }
       $socargs{$pub} = $pub;
@@ -201,7 +201,7 @@ sub sym_create {
             wantarray ? @$f : $f;
          };
       } elsif ($i eq 'HASH') {
-         print STDERR "\tsub $pub: hash-based\n" if $SymObj::Debug;
+         print STDERR "\tsub $pub: hash-based\n" if $SymObj::Verbose;
          *{"${pkg}::$pub"} = sub {
             my $self = $_[0];
             if (ref $self) { shift; }
@@ -218,6 +218,8 @@ sub sym_create {
          };
       } else {
          # Scalar (or "typeless")
+         print STDERR "\tsub $pub: scalar-based (\"typeless\")\n"
+            if $SymObj::Verbose;
          *{"${pkg}::$pub"} = sub {
             my $self = $_[0];
             if (ref $self) { shift; }
