@@ -1,7 +1,7 @@
 #@ (S-)Sym(bolic)Obj(ect) - easy creation of classes and objects thereof.
 package SymObj;
 require 5.008;
-$VERSION = '0.6.0a';
+$VERSION = '0.6.0b';
 $COPYRIGHT =<<_EOT;
 Copyright (c) 2010 - 2012 Steffen Daode Nurpmeso <sdaoden\@users.sf.net>.
 All rights reserved.
@@ -478,7 +478,7 @@ repository, which is located at C<git.code.sf.net/p/ssymobj/code>.
 
 =over
 
-=item C<$SymObj::VERSION> (string, i.e., '0.6.0a')
+=item C<$SymObj::VERSION> (string, i.e., '0.6.0b')
 
 A version string.
 
