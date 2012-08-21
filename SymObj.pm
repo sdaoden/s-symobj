@@ -35,7 +35,7 @@ $Verbose = 0;
 sub _UUID { 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD'; }
 
 sub _complain_rdonly {
-   return unless $SymObj::Verbose;
+   return unless $SymObj::Debug;
    my ($pkg, $pub) = @_;
    print STDERR "${pkg}::$pub(): write access to readonly field rejected\n";
 }
@@ -54,17 +54,22 @@ sub sym_create {
    # Even that is overkill unless the %FIELDS really require that though.
    # Since we use these also for management tasks, then, do inject regardless
    # of wether the symbols are public or not.
+   sub NEEDS_ARRAY   { 1<<0; }
+   sub NEEDS_HASH    { 1<<1; }
+   sub NEEDS_ALL     { 3; }
    my $i = 0;
+
    foreach my $datum (keys %$tfields) {
       if (ref $tfields->{$datum} eq 'ARRAY') {
-         $i |= 1;
-         last if ($i & 3) == 3;
+         $i |= NEEDS_ARRAY;
+         last if ($i & NEEDS_ALL) == NEEDS_ALL;
       } elsif (ref $tfields->{$datum} eq 'HASH') {
-         $i |= 2;
-         last if ($i & 3) == 3;
+         $i |= NEEDS_HASH;
+         last if ($i & NEEDS_ALL) == NEEDS_ALL;
       }
    }
-   if ($i & 1) {
+
+   if ($i & NEEDS_ARRAY) {
       print STDERR "\t..adding shared array handler\n" if $SymObj::Verbose;
       *{"${pkg}::_SymObj_ArraySet"} = sub {
          my ($self, $pub, $datum) = (shift, shift, shift);
@@ -87,7 +92,8 @@ sub sym_create {
          $dref;
       };
    }
-   if ($i & 2) {
+
+   if ($i & NEEDS_HASH) {
       print STDERR "\t..adding shared hash handler\n" if $SymObj::Verbose;
       *{"${pkg}::_SymObj_HashSet"} = sub {
          my ($self, $pub, $datum) = (shift, shift, shift);
@@ -312,6 +318,7 @@ jOVER_OUTER:
          if ($argc & 1) {
             --$argc;
             print STDERR "${pkg}: $class->new(): odd argument discarded!\n"
+               if $SymObj::Debug;
          }
       }
    }
@@ -335,7 +342,7 @@ jOVER_OUTER:
       } elsif (ref $tv eq 'HASH') {
          unless (ref $v eq 'ARRAY' || ref $v eq 'HASH') {
             print STDERR "${pkg}: $class->new(): ",
-               "'$k' requires ARRAY or HASH argument\n";
+               "'$k' requires ARRAY or HASH argument\n" if $SymObj::Debug;
             next;
          }
          $self->_SymObj_HashSet('new()', $pk, $v);
