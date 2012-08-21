@@ -35,15 +35,13 @@ which is located at git.code.sf.net/p/ssymobj/code.
 WARNING
 -------
 
-2012-07-24, tag v0.6.0a
-   The interface was changed *incompatibly* to allow for much more
-   convenient usage and upward compatibility with possibly upcoming
-   changes.  If you knew S-SymObj, please reread the documentation.
-   But in short: the member ``%FIELDS`` are no longer necessary for
-   the constructor, only the class creator.  (But note that S-SymObj
-   now keeps an internal reference to accomplish that.)  And no more
-   exclusion lists have to be used, but instead exclusion is specified
-   by prefixing the member name in the ``%FIELDS`` array.
+S-SymObj entered a stage of *incompatible* interface changes on
+2012-07-24, starting with tag v0.6.0a.  Don't expect that the interface
+to be stable before the v0.6.0 release is tagged!
+If you knew S-SymObj before, please reread the documentation.
+It has more features, is much easier to use and, optionally, all that
+even faster than before.
+Thank you!
 
 Installation
 ------------
@@ -63,22 +61,23 @@ up-to-date documentation on SymObj.pm, e.g., ::
 
     pod2text SymObj.pm
 
-The example from the documentation as of 2012-07-24: ::
+The example from the documentation as of 2012-08-21: ::
 
    BEGIN {
       require 'SymObj.pm';       
-      $SymObj::Verbose = 1;
-      #$SymObj::Debug = 0;
+      ($SymObj::Debug, $SymObj::Verbose, $SymObj::NoFastCTors) = (1, 0, 0);
    }
+
+   ## "Feed-in and forget" ##
 
    {package X_Super;
       BEGIN {
          SymObj::sym_create(__PACKAGE__, {
-            _name => '', _array => [qw(av1 av2)],
-            _hash => {hk1 => 'hv1', hk2 => 'hv2'}
-         });
+               _name => '',
+               _array => [qw(av1 av2)],
+               _hash => {hk1 => 'hv1', hk2 => 'hv2'}
+            });
       }
-
       sub new { SymObj::obj_ctor(__PACKAGE__, shift, \@_); }
    }
 
@@ -88,7 +87,6 @@ The example from the documentation as of 2012-07-24: ::
          @ISA = ('X_Super');
          SymObj::sym_create(__PACKAGE__, {}); # <- adds no fields on its own
       }
-
       sub new { SymObj::obj_ctor(__PACKAGE__, shift, \@_); }
    }
 
@@ -124,10 +122,43 @@ The example from the documentation as of 2012-07-24: ::
 
    SymObj::obj_dump($sp);
 
-   # Adjust the per-class template
+   ## Adjust the per-class template (but don't do that) ##
+
    undef %{X_Super::hash()};
-   X_Super::hash(newhk1 => 'newhv1', newhk2 => 'newhv2');
+   X_Super::hash(newhk1=>'newhv1', newhk2=>'newhv2');
    $sp = SomePack->new(name => 'SymObj is really easy');
    SymObj::obj_dump($sp);
+
+   ## "Fast-constructor" path, no/readonly accessors ##
+
+   {package FC1;
+      BEGIN {
+         SymObj::sym_create(__PACKAGE__, { '?_n' => 'FC1', '!_v' => '1' },
+            sub {
+               my $self = shift;
+               print ".. FC1::fast-ctor (", $self->{_n}, ")\n";
+            });
+      }
+      sub new { SymObj::obj_ctor_fast(__PACKAGE__, shift, \@_); }
+   }
+   {package FC2;
+      our (@ISA);
+      BEGIN {
+         @ISA = ('FC1');
+         SymObj::sym_create(__PACKAGE__, { '?_n' => 'FC2', '!_v' => '2' },
+            sub {
+               my $self = shift;
+               print ".. FC2::fast-ctor (", $self->{_n}, ")\n";
+            });
+      }
+      sub new { SymObj::obj_ctor_fast(__PACKAGE__, shift, \@_); }
+   }
+
+   my $i = FC2->new;
+   print "i->v = ", $i->v(), "\n";
+   $i->v('it is readonly..');
+   $i = FC2->new(v=>3);
+   print "i->v = ", $i->v(), "\n";
+   #$i->n('no accessor for this at all..');
 
 .. vim:set fenc=utf-8 filetype=rst syntax=rst ts=8 sts=3 sw=3 et tw=75:
