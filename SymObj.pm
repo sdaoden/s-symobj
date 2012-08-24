@@ -67,7 +67,7 @@ sub sym_create { # {{{
    my ($flags, $tfields, $ctor) = @_;
    $flags &= _USRMASK;
    $flags |= $Debug > 1 ? (DEBUG | VERBOSE) : DEBUG if $Debug;
-   my ($pkg, $i, $j, @isa, %actorargs, @ctorovers) = (scalar caller);
+   my ($pkg, $i, $j, @isa, @arri, %actorargs, @ctorovers) = (scalar caller);
    print $MsgFH "SymObj::sym_create(): $pkg\n" if $flags & VERBOSE;
 
    # For (superior debug ctor) argument checking, create a hash of
@@ -102,16 +102,15 @@ sub sym_create { # {{{
    unshift @isa, $pkg;
 
    # Accessor and $tfields handling {{{
-   # Minimize code-blow - offer some basic SymObj symtable entries.
+   # We use shared per-object field handler subs to minimize code blow a bit.
    # Even that is overkill unless the %FIELDS really require that though.
-   # Since we use these also for management tasks, then, do inject regardless
-   # of wether the symbols are public or not.
-   foreach $i (keys %$tfields) {
-      $i = ref $tfields->{$i};
-      if ($i eq 'ARRAY') {
+   @arri = keys %$tfields;
+   foreach $i (@arri) {
+      $j = ref $tfields->{$i};
+      if ($i =~ /^@/ || $j eq 'ARRAY') {
          $flags |= _HAS_ARRAY;
          last if ($flags & _HAS_ALL) == _HAS_ALL;
-      } elsif ($i eq 'HASH') {
+      } elsif ($i =~ /^%/ || $j eq 'HASH') {
          $flags |= _HAS_HASH;
          last if ($flags & _HAS_ALL) == _HAS_ALL;
       }
@@ -179,30 +178,31 @@ sub sym_create { # {{{
    }
 
    # Create accessor symtable entries
-   foreach $j (keys %$tfields) {
-      sub TYPE_EXCLUDE()   { 1<<0 }
-      sub TYPE_RDONLY()    { 1<<1 }
+   foreach $j (@arri) {
+      sub TYPE_ARRAY()     { 1<<0 }
+      sub TYPE_HASH()      { 1<<1 }
+      sub TYPE_EXCLUDE()   { 1<<2 }
+      sub TYPE_RDONLY()    { 1<<3 }
       my ($xj, $pj, $tj) = ($j, $j, 0);
 
-      # Don't create accessor subs? Provide only read-only access?
-      if ($pj =~ /^\?/) {
-         $tj = TYPE_EXCLUDE;
-      } elsif ($pj =~ /^!/) {
-         $tj = TYPE_RDONLY;
+      $j =~ /^([@%])?([?!])?(_)?(.*)/;
+      $tj |= $1 eq '@' ? TYPE_ARRAY : TYPE_HASH if defined $1;
+      $tj |= $2 eq '?' ? TYPE_EXCLUDE : TYPE_RDONLY if defined $2;
+      print $MsgFH "\tSymbol '$pj': does NOT start with underscore _!\n"
+         if ! defined $3 && ($flags & DEBUG);
+      unless (defined $4 && length $4) {
+         print $MsgFH "\tSymbol '$pj': consists only of modifier and/or ",
+            "typedef and/or underscore!  Skip!!\n" if $flags & DEBUG;
+         delete $tfields->{$j};
+         next;
       }
+      $xj = (defined $3 ? $3 : '') . $4;
+      $pj = $4;
 
-      # Remove the modifier from the symbol.
-      if ($tj != 0) {
-         $xj = $pj = substr $pj, 1;
+      if ($tj) {
          $tfields->{$xj} = $tfields->{$j};
          delete $tfields->{$j};
       }
-      if ($pj =~ /^_/) {
-         $pj = substr $pj, 1;
-      } elsif ($flags & DEBUG) {
-         print $MsgFH "\tSymbol '$pj': does NOT start with underscore _!\n";
-      }
-
       $i = ref $tfields->{$xj};
 
       # Does any superclass define this symbol already, i.e., is this an
@@ -211,6 +211,7 @@ sub sym_create { # {{{
          if (ref ${$actorargs{$pj}} ne $i) {
             print $MsgFH "${pkg}: overrides '$pj' of some super class ",
                "with incompatible type!  Skip!!\n" if $flags & DEBUG;
+            delete $tfields->{$xj};
             next;
          }
          push @ctorovers, $pj;
@@ -225,9 +226,11 @@ sub sym_create { # {{{
          ? sub { $_[0]->{$xj}; } : sub { \$_[0]->{$xj}; };
 
       # Hope for perl(1) to eventually optimize away the TYPE_* conditions..
-      if ($i eq 'ARRAY') {
+      if (($tj & TYPE_ARRAY) || $i eq 'ARRAY') {
          print $MsgFH "\tsub $pj: array-based\n" if $flags & VERBOSE;
-         if ($tj == TYPE_EXCLUDE) {
+         if ($tj & TYPE_EXCLUDE) {
+            print $MsgFH "\t\t.. excluded from \$self, only \"class-static\" ",
+               "data accessor\n" if $flags & VERBOSE;
             *{"${pkg}::$pj"} = sub {
                my $f = $tfields->{$xj};
                $f = "${pkg}::_SymObj_ArraySet"->($tfields, $pj, $xj, @_) if @_;
@@ -241,15 +244,17 @@ sub sym_create { # {{{
                my $f = $self->{$xj};
                if (@_ > 0) {
                   SymObj::_complain_rdonly($pkg, $pj)
-                     if $tj == TYPE_RDONLY && ($flags & DEBUG);
+                     if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
                   $f = "${pkg}::_SymObj_ArraySet"->($self, $pj, $xj, @_);
                }
                wantarray ? @$f : $f;
             };
          }
-      } elsif ($i eq 'HASH') {
+      } elsif (($tj & TYPE_HASH) || $i eq 'HASH') {
          print $MsgFH "\tsub $pj: hash-based\n" if $flags & VERBOSE;
-         if ($tj == TYPE_EXCLUDE) {
+         if ($tj & TYPE_EXCLUDE) {
+            print $MsgFH "\t\t.. excluded from \$self, only \"class-static\" ",
+               "data accessor\n" if $flags & VERBOSE;
             *{"${pkg}::$pj"} = sub {
                my $f = $tfields->{$xj};
                $f = "${pkg}::_SymObj_HashSet"->($tfields, $pj, $xj, @_) if @_;
@@ -263,7 +268,7 @@ sub sym_create { # {{{
                my $f = $self->{$xj};
                if (@_ > 0) {
                   SymObj::_complain_rdonly($pkg, $pj)
-                     if $tj == TYPE_RDONLY && ($flags & DEBUG);
+                     if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
                   $f = &{${"${pkg}::"}{_SymObj_HashSet}}($self, $pj, $xj, @_);
                }
                wantarray ? %$f : $f;
@@ -273,7 +278,9 @@ sub sym_create { # {{{
          # Scalar (or "typeless")
          print $MsgFH "\tsub $pj: scalar-based ('untyped')\n"
             if $flags & VERBOSE;
-         if ($tj == TYPE_EXCLUDE) {
+         if ($tj & TYPE_EXCLUDE) {
+            print $MsgFH "\t\t.. excluded from \$self, only \"class-static\" ",
+               "data accessor\n" if $flags & VERBOSE;
             *{"${pkg}::$pj"} = sub {
                $tfields->{$xj} = shift if @_;
                $self->{$xj};
@@ -285,7 +292,7 @@ sub sym_create { # {{{
                else           { $self = $tfields; }
                if (@_ > 0) {
                   SymObj::_complain_rdonly($pkg, $pj)
-                     if $tj == TYPE_RDONLY && ($flags & DEBUG);
+                     if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
                   $self->{$xj} = shift;
                }
                $self->{$xj};
@@ -824,29 +831,43 @@ If they act upon arrays or hashs they'll return references to the
 members by default, but do return copies in C<wantarray> context
 instead.
 
-If a key in C<$2> is prefixed with a question mark, as in C<'?_name'>,
-then this means that no accessor subs will be created for C<name>.
-The mark will be stripped internally, i.e., the member is C<_name>,
-as expected, and that's also the way it is handled otherwise.
+If a key in C<$2> is prefixed with an AT or a PERCENT, as in C<'@_name'>
+or C<'%_name'>, then the field in question is assumed to be an array
+or hash, respectively.  By default S-SymObj uses the value to figure
+out which kind of accessor has to be used, but for that the value must
+be set to a value different to C<undef>, which sometimes is not desired,
+i.e., sometimes a field should be lazy allocated, only if it is really
+used.  Note that the generic accessors will automatically instantiate
+an empty array/hash as necessary.
 
-Just likewise, if a key in C<$2> are prefixed with an exclamation mark,
-as in C<'!_name'>, then there will only be a readonly accessor sub be
-made available.  Write access will be rejected, and also logged if
-C<$SymObj::Debug> is true.
+After the (optional) C<@> or C<%> type modifier, one may use (also
+optionally) C<?> or C<!>, mutually exclusive, as an access modifier.
+If a question mark is seen, as in C<'?_name'>, then this means that
+no accessor subs will be created for C<name>.  Just likewise for
+exclamation mark, as in C<'!_name'>, there will only be a readonly
+accessor sub available.  Write access will be actively rejected in
+this case.
+
+Whatever type and/or access modifier(s) was/were present, they will
+be stripped from the field name, just like a following underscore will,
+i.e., a field C<'@!_name'> will actually end up as C<_name> in the
+class-static hash, with an accessor named C<name>.
 
 In addition to those accessor subs there will I<always> be private
 accessor subs be created which use the public name prefixed with two
 underscores, as in C<$self-E<gt>__name()>.  These subs do nothing
 except returning a reference to the field in question.  They're ment
 to be used instead of direct access of members in some contexts, i.e.,
-for encapsulation purposes.
+for encapsulation purposes.  Note that they do I<not> automatically
+instantiate lazy allocated fields.
 
 Note that, if any of the superclasses of C<$1>, as detected through
 its C<@ISA> array, provides fields which have identical names to what
 is provided in C<$2>, this situation is treated as an overwrite request,
 and it is verified that the value type matches.  Unfortunately the
 subclass will create accessor subs on its own, because users need to
-be able to adjust the class-static data.
+be able to adjust the class-static data.  And, also unfortunately,
+different access policies won't be detected.
 
 =back
 
