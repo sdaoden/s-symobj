@@ -35,12 +35,11 @@ which is located at git.code.sf.net/p/ssymobj/code.
 WARNING
 -------
 
-S-SymObj entered a stage of *incompatible* interface changes on
-2012-07-24, starting with tag v0.6.0a.  Don't expect that the interface
-to be stable before the v0.6.0 release is tagged!
-If you knew S-SymObj before, please reread the documentation.
-It has more features, is much easier to use and, optionally, all that
-even faster than before.
+S-SymObj was incompatibly rewritten with the aim of improving the use,
+more features and more speed after tag v0.5.2, which has been applied
+to draw this border of incompatibility!  If you knew S-SymObj before,
+please reread the documentation!  And please don't expect that the
+interface is really stable before the v0.6.0 release is tagged.
 Thank you!
 
 Installation
@@ -49,9 +48,9 @@ Installation
 SymObj.pm is a Perl module and therefore needs to be in ``@INC`` if
 scripts should be able to find it easily.  This can be accomplished
 by either copying SymObj.pm to one of the paths shown by ``$ perl -V``,
-or by specifying a path via the ``-I`` command line option, or by
+or by specifying a path via the ``-I`` command line option or by
 placing a path in the ``PERL5LIB`` environment variable.  The last
-solution is maybe the easiest one.
+solution is maybe the easiest and most flexible one.
 
 Usage
 -----
@@ -61,33 +60,31 @@ up-to-date documentation on SymObj.pm, e.g., ::
 
     pod2text SymObj.pm
 
-The example from the documentation as of 2012-08-21: ::
+The (stripped down) example from the documentation as of 2012-08-24: ::
 
    BEGIN {
       require 'SymObj.pm';       
-      ($SymObj::Debug, $SymObj::Verbose, $SymObj::NoFastCTors) = (1, 0, 0);
+      $SymObj::Debug = 2; # Default: 1
    }
 
    ## "Feed-in and forget" ##
 
    {package X_Super;
       BEGIN {
-         SymObj::sym_create(__PACKAGE__, {
+         SymObj::sym_create(SymObj::NONE, { # (NONE is 0..)
                _name => '',
                _array => [qw(av1 av2)],
                _hash => {hk1 => 'hv1', hk2 => 'hv2'}
             });
       }
-      sub new { SymObj::obj_ctor(__PACKAGE__, shift, \@_); }
    }
 
    {package SomePack;
       our (@ISA);
       BEGIN {
          @ISA = ('X_Super');
-         SymObj::sym_create(__PACKAGE__, {}); # <- adds no fields on its own
+         SymObj::sym_create(0, {}); # <- adds no fields on its own
       }
-      sub new { SymObj::obj_ctor(__PACKAGE__, shift, \@_); }
    }
 
    my $sp = SomePack->new(name => 'SymObj is easy', 'unknown' => 'arg');
@@ -113,52 +110,42 @@ The example from the documentation as of 2012-08-21: ::
    $vr = $sp->array(   '1_4' =>           '2_4');
    my @arrcopy = $sp->array(); # wantarray context gives copy instead
 
-   $vr = $sp->hash(    i_1 => 'you',  we_1 => 'all');
-   $vr = $sp->hash(   'i_2',  'you', 'we_2',  'all');
-   $vr = $sp->hash(qw( i_3    you     we_3     all));
-   $vr = $sp->hash([qw(i_4    you     we_4     all)]);
-   $vr = $sp->hash({   i_5 => 'you',  we_5 => 'all'});
+   $vr = $sp->hash(    i_1 => 'yo1',  we_1 => 'al1');
+   $vr = $sp->hash(   'i_2',  'yo2', 'we_2',  'al2');
+   $vr = $sp->hash(qw( i_3    yo3     we_3     al3));
+   $vr = $sp->hash([qw(i_4    yo4     we_4     al4)]);
+   $vr = $sp->hash({   i_5 => 'yo5',  we_5 => 'al5'});
    my %hashcopy = $sp->hash(); # wantarray context gives copy instead
 
-   SymObj::obj_dump($sp);
-
-   ## Adjust the per-class template (but don't do that) ##
-
-   undef %{X_Super::hash()};
-   X_Super::hash(newhk1=>'newhv1', newhk2=>'newhv2');
-   $sp = SomePack->new(name => 'SymObj is really easy');
-   SymObj::obj_dump($sp);
-
-   ## "Fast-constructor" path, no/readonly accessors ##
+   ## No-access/readonly accessors; "user constructors" ##
 
    {package FC1;
       BEGIN {
-         SymObj::sym_create(__PACKAGE__, { '?_n' => 'FC1', '!_v' => '1' },
+         SymObj::sym_create(0, { '?_n' => 'FC1', '!_v' => '1' },
             sub {
-               my $self = shift;
-               print ".. FC1::fast-ctor (", $self->{_n}, ")\n";
+               my ($self, $pkg) = @_;
+               print ".. FC1::{__ctor}(): (", ${$self->__n}, ")\n";
             });
       }
-      sub new { SymObj::obj_ctor_fast(__PACKAGE__, shift, \@_); }
    }
    {package FC2;
       our (@ISA);
       BEGIN {
          @ISA = ('FC1');
-         SymObj::sym_create(__PACKAGE__, { '?_n' => 'FC2', '!_v' => '2' },
-            sub {
-               my $self = shift;
-               print ".. FC2::fast-ctor (", $self->{_n}, ")\n";
-            });
+         SymObj::sym_create(0, { '?_n' => 'FC2', '!_v' => '2' });
       }
-      sub new { SymObj::obj_ctor_fast(__PACKAGE__, shift, \@_); }
+      sub __ctor {
+         my ($self, $pkg) = @_;
+         print ".. FC2::__ctor(): (", ${$self->__n}, ")\n";
+      }
    }
 
    my $i = FC2->new;
-   print "i->v = ", $i->v(), "\n";
+   die "FC2, 1" if $i->v ne '2';
    $i->v('it is readonly..');
+   $i->n('no accessor for this at all..');
+   FC2::n('Class static data, updated (but do not do that)');
    $i = FC2->new(v=>3);
-   print "i->v = ", $i->v(), "\n";
-   #$i->n('no accessor for this at all..');
+   die "FC2, 1" if $i->v ne '3';
 
 .. vim:set fenc=utf-8 filetype=rst syntax=rst ts=8 sts=3 sw=3 et tw=75:
