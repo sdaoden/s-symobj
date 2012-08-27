@@ -202,13 +202,15 @@ sub sym_create { # {{{
       if ($tj) {
          $tfields->{$xj} = $tfields->{$j};
          delete $tfields->{$j};
+         $i = ($tj & TYPE_ARRAY) ? 'ARRAY' : ($tj & TYPE_HASH) ? 'HASH' : '';
+      } else {
+         $i = ref $tfields->{$xj};
       }
-      $i = ref $tfields->{$xj};
 
       # Does any superclass define this symbol already, i.e., is this an
       # override request?
       if (exists $actorargs{$pj}) {
-         if (ref ${$actorargs{$pj}} ne $i) {
+         if ($i ne ref ${$actorargs{$pj}}) {
             print $MsgFH "${pkg}: overrides '$pj' of some super class ",
                "with incompatible type!  Skip!!\n" if $flags & DEBUG;
             delete $tfields->{$xj};
