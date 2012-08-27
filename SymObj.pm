@@ -223,83 +223,74 @@ sub sym_create { # {{{
       # No it is not, we're the first..
       $actorargs{$pj} = \$tfields->{$xj};
 
-      # Always create a private accessor that returns a reference
-      *{"${pkg}::__$pj"} = ($i eq 'ARRAY' || $i eq 'HASH')
-         ? sub { $_[0]->{$xj}; } : sub { \$_[0]->{$xj}; };
-
       # Hope for perl(1) to eventually optimize away the TYPE_* conditions..
       if (($tj & TYPE_ARRAY) || $i eq 'ARRAY') {
          print $MsgFH "\tsub $pj: array-based\n" if $flags & VERBOSE;
-         if ($tj & TYPE_EXCLUDE) {
-            print $MsgFH "\t\t.. excluded from \$self, only \"class-static\" ",
-               "data accessor\n" if $flags & VERBOSE;
-            *{"${pkg}::$pj"} = sub {
-               my $f = $tfields->{$xj};
-               $f = "${pkg}::_SymObj_ArraySet"->($tfields, $pj, $xj, @_) if @_;
-               wantarray ? @$f : $f;
-            };
-         } else {
-            *{"${pkg}::$pj"} = sub {
-               my $self = $_[0];
-               if (ref $self) { shift; }
-               else           { $self = $tfields; }
-               my $f = $self->{$xj};
-               if (@_ > 0) {
-                  SymObj::_complain_rdonly($pkg, $pj)
-                     if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
-                  $f = "${pkg}::_SymObj_ArraySet"->($self, $pj, $xj, @_);
+         *{"${pkg}::__$pj"} = sub { $_[0]->{$xj}; };
+         *{"${pkg}::$pj"} = sub {
+            my $self = $_[0];
+            if (($self = ref $self) ne '' && defined %{"${self}::"}) {
+               $self = shift;
+               if ($tj & TYPE_EXCLUDE) {
+                  SymObj::_complain_exclude($pkg, $pj) if $flags & DEBUG;
+                  $self = $tfields;
                }
-               wantarray ? @$f : $f;
-            };
-         }
+            } else {
+               $self = $tfields;
+            }
+            my $f = $self->{$xj};
+            if (@_ > 0) {
+               SymObj::_complain_rdonly($pkg, $pj)
+                  if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
+               $f = "${pkg}::_SymObj_ArraySet"->($self, $pj, $xj, @_);
+            }
+            wantarray ? @$f : $f;
+         };
       } elsif (($tj & TYPE_HASH) || $i eq 'HASH') {
          print $MsgFH "\tsub $pj: hash-based\n" if $flags & VERBOSE;
-         if ($tj & TYPE_EXCLUDE) {
-            print $MsgFH "\t\t.. excluded from \$self, only \"class-static\" ",
-               "data accessor\n" if $flags & VERBOSE;
-            *{"${pkg}::$pj"} = sub {
-               my $f = $tfields->{$xj};
-               $f = "${pkg}::_SymObj_HashSet"->($tfields, $pj, $xj, @_) if @_;
-               wantarray ? %$f : $f;
-            };
-         } else {
-            *{"${pkg}::$pj"} = sub {
-               my $self = $_[0];
-               if (ref $self) { shift; }
-               else           { $self = $tfields; }
-               my $f = $self->{$xj};
-               if (@_ > 0) {
-                  SymObj::_complain_rdonly($pkg, $pj)
-                     if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
-                  $f = &{${"${pkg}::"}{_SymObj_HashSet}}($self, $pj, $xj, @_);
+         *{"${pkg}::__$pj"} = sub { $_[0]->{$xj}; };
+         *{"${pkg}::$pj"} = sub {
+            my $self = $_[0];
+            if (($self = ref $self) ne '' && defined %{"${self}::"}) {
+               $self = shift;
+               if ($tj & TYPE_EXCLUDE) {
+                  SymObj::_complain_exclude($pkg, $pj) if $flags & DEBUG;
+                  $self = $tfields;
                }
-               wantarray ? %$f : $f;
-            };
-         }
+            } else {
+               $self = $tfields;
+            }
+            my $f = $self->{$xj};
+            if (@_ > 0) {
+               SymObj::_complain_rdonly($pkg, $pj)
+                  if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
+               $f = &{${"${pkg}::"}{_SymObj_HashSet}}($self, $pj, $xj, @_);
+            }
+            wantarray ? %$f : $f;
+         };
       } else {
          # Scalar (or "typeless")
          print $MsgFH "\tsub $pj: scalar-based ('untyped')\n"
             if $flags & VERBOSE;
-         if ($tj & TYPE_EXCLUDE) {
-            print $MsgFH "\t\t.. excluded from \$self, only \"class-static\" ",
-               "data accessor\n" if $flags & VERBOSE;
-            *{"${pkg}::$pj"} = sub {
-               $tfields->{$xj} = shift if @_;
-               $self->{$xj};
-            };
-         } else {
-            *{"${pkg}::$pj"} = sub {
-               my $self = $_[0];
-               if (ref $self) { shift; }
-               else           { $self = $tfields; }
-               if (@_ > 0) {
-                  SymObj::_complain_rdonly($pkg, $pj)
-                     if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
-                  $self->{$xj} = shift;
+         *{"${pkg}::__$pj"} = sub { \$_[0]->{$xj}; };
+         *{"${pkg}::$pj"} = sub {
+            my $self = $_[0];
+            if (($self = ref $self) ne '' && defined %{"${self}::"}) {
+               $self = shift;
+               if ($tj & TYPE_EXCLUDE) {
+                  SymObj::_complain_exclude($pkg, $pj) if $flags & DEBUG;
+                  $self = $tfields;
                }
-               $self->{$xj};
-            };
-         }
+            } else {
+               $self = $tfields;
+            }
+            if (@_ > 0) {
+               SymObj::_complain_rdonly($pkg, $pj)
+                  if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
+               $self->{$xj} = shift;
+            }
+            $self->{$xj};
+         };
       }
    }
    # }}}
@@ -562,6 +553,12 @@ sub _ctor_cleanhier { # {{{
    $self;
 } # }}}
 
+sub _complain_exclude {
+   my ($pkg, $pub) = @_;
+   print $MsgFH "${pkg}::$pub(): field can't be accessed through object, ",
+      "accessing class-static!\n";
+}
+
 sub _complain_rdonly {
    my ($pkg, $pub) = @_;
    print $MsgFH "${pkg}::$pub(): write access to READONLY field!\n";
@@ -601,7 +598,9 @@ way, which makes it pretty useful in times when the interface is
 unstable.  The generated accessor subs which are created for arrays
 and hashes implement a I<feed in and forget> approach, since they can
 handle all kinds of arguments (or try it); this is also true for the
-constructor.
+constructor.  If debug is false, no such checking is performed, and a
+pure S-SymObj-only class hierarchy will use a superfast constructor
+implementation.
 
 SymObj.pm works for Multiple-Inheritance as good as perl(1) allows.
 (That is to say that only one straight object tree can be used, further
