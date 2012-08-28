@@ -65,9 +65,11 @@ sub obj_dump {
 sub sym_create { # {{{
    my ($flags, $tfields, $ctor) = @_;
    $flags &= _USRMASK;
+   $flags |= DEBUG if $flags & VERBOSE;
    $flags |= $Debug > 1 ? (DEBUG | VERBOSE) : DEBUG if $Debug;
-   my ($pkg, $i, $j, @isa, @arri, %actorargs, @ctorovers) = (scalar caller);
-   print $MsgFH "SymObj::sym_create(): $pkg\n" if $flags & VERBOSE;
+   my ($pkg, $i, $j, @isa, @arri, %actorargs, @ctorovers) =
+      (scalar caller, $flags & VERBOSE);
+   print $MsgFH "SymObj::sym_create(): $pkg\n" if $i;
 
    # For (superior debug ctor) argument checking, create a hash of
    # public symbols (inherit those from parents first ...)
@@ -82,6 +84,9 @@ sub sym_create { # {{{
       }
    }
    unshift @isa, $pkg;
+
+   print $MsgFH ".. (inherited VERBOSE from superclass:) ",
+      "SymObj::sym_create(): $pkg\n" if ($flags & VERBOSE) && ! $i;
 
    # Accessor and $tfields handling {{{
    # We use shared per-object field handler subs to minimize code blow a bit.
