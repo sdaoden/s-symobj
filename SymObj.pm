@@ -42,7 +42,6 @@ sub _CLEANHIER()  { 1<<5 }
 $MsgFH = *STDERR;
 $Debug = 1; # 0,1,2
 
-# TODO pack_ series incomplete (available in eval?? require??)
 sub pack_exists {
    my ($pkg) = @_;
    defined %{"${pkg}::"};
@@ -581,7 +580,7 @@ sub _complain_rdonly {
 
 sub _UUID { 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD'; }
 
-sub _find_usr_ctor {
+sub _find_usr_ctor { # {{{
    # No constructor was given to sym_create(), or it was no code-ref.
    # Try to find out what the user wants.
    my ($self, $pkg, $ctor) = @_;
@@ -597,7 +596,7 @@ sub _find_usr_ctor {
       ${"${pkg}::"}{_SymObj_USR_CTOR} = $ctor;
       &$ctor($self);
    }
-}
+} # }}}
 
 1;
 __END__

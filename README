@@ -78,7 +78,6 @@ The (stripped down) example from the documentation as of 2012-08-24: ::
             });
       }
    }
-
    {package SomePack;
       our (@ISA);
       BEGIN {
