@@ -610,23 +610,32 @@ __END__
 =head1 S-SymObj
 
 SymObj.pm provides an easy way to create and construct symbol-tables
-and objects.  With a simple hash one defines class-fields an object
-should have.  A generic constructor will then create the object and
-all of its superclasses, checking and filtering arguments along the
-way, which makes it pretty useful in times when the interface is
-unstable.  The generated accessor subs which are created for arrays
-and hashes implement a I<feed in and forget> approach, since they can
-handle all kinds of arguments (or try it); this is also true for the
-constructor.  If debug is false, no such checking is performed, and a
-pure S-SymObj-only class hierarchy will use a superfast constructor
-implementation.
+and objects.  With a simple hash one defines the fields an object
+should have.  An automatically instantiated constructor can then be
+used to create the object, and the generated accessor subs implement
+a I<feed in and forget> approach when they are about to manage arrays
+or hashes, trying to handle all kinds of arguments; this is also true
+for the constructor.
+
+If debug was enabled upon creation time a constructor which does a lot
+of argument checking and more is used, which is pretty useful in times
+when the interface is unstable.  Otherwise a different constructor is
+used which implements no checking at all; and if the object in question
+is the head of a "clean" object tree, one that is entirely managed by
+S-SymObj, then indeed a super-fast super-lean constructor implementation
+is used that'll rock your house.
 
 SymObj.pm works for Multiple-Inheritance as good as perl(1) allows.
 (That is to say that only one straight object tree can be used, further
 trees of C<@ISA> need to be joined into the C<$self> hash and thus
 loose I<their> C<$self> along the way, of course.)  It should integrate
 neatlessly into SMP in respect to objects; package "static-data" however
-is not protected.
+is not protected.  Note that S-SymObj does I<not> add tweaks to the
+perl(1) object mechanism in respect to superclasses that occur multiple
+times in the C<@ISA> of some class; this is because the resulting
+behaviour would differ for clean S-SymObj managed and mixed trees, as
+well as for debug and non-debug mode (though that could be managed,
+actually).
 
 The S-SymObj project is located at
 L<https://sourceforge.net/projects/ssymobj>; since that is a SourceForge
@@ -641,7 +650,7 @@ repository, which is located at C<git.code.sf.net/p/ssymobj/code>.
       $SymObj::Debug = 2; # Default: 1
    }
 
-   ## "Feed-in and forget" ##
+   print "## \"Feed-in and forget\" ##\n";
 
    {package X_Super;
       BEGIN {
@@ -650,16 +659,13 @@ repository, which is located at C<git.code.sf.net/p/ssymobj/code>.
                _array => [qw(av1 av2)],
                _hash => {hk1 => 'hv1', hk2 => 'hv2'}
             });
-      }
-   }
-
+      }}
    {package SomePack;
       our (@ISA);
       BEGIN {
          @ISA = ('X_Super');
          SymObj::sym_create(0, {}); # <- adds no fields on its own
-      }
-   }
+      }}
 
    my $sp = SomePack->new(name => 'SymObj is easy', 'unknown' => 'arg');
 
@@ -675,7 +681,7 @@ repository, which is located at C<git.code.sf.net/p/ssymobj/code>.
    # They return references, except for scalars (always) and in wantarray
    # context, in which case you get a copy
    my $v = $sp->name('SymObj is really nice to use');
-   print "name is <$v>\n";
+   die if $v ne 'SymObj is really nice to use';
 
    my $vr;
    $vr = $sp->array(   '1_1'); $sp->array('2_1');
@@ -683,12 +689,10 @@ repository, which is located at C<git.code.sf.net/p/ssymobj/code>.
    $vr = $sp->array([qw(1_3                2_3)]);
    $vr = $sp->array(   '1_4' =>           '2_4');
    my @arrcopy = $sp->array(); # wantarray context gives copy instead
-   die "arrcopy"
-      if ($arrcopy[0] ne 'av1' || $arrcopy[1] ne 'av2' ||
-         $arrcopy[2] ne '1_1' || $arrcopy[3] ne '2_1' ||
-         $arrcopy[4] ne '1_2' || $arrcopy[5] ne '2_2' ||
-         $arrcopy[6] ne '1_3' || $arrcopy[7] ne '2_3' ||
-         $arrcopy[8] ne '1_4' || $arrcopy[9] ne '2_4');
+   die "arrcopy" if $arrcopy[0] ne 'av1' || $arrcopy[1] ne 'av2' ||
+      $arrcopy[2] ne '1_1' || $arrcopy[3] ne '2_1' || $arrcopy[4] ne '1_2' ||
+      $arrcopy[5] ne '2_2' || $arrcopy[6] ne '1_3' || $arrcopy[7] ne '2_3' ||
+      $arrcopy[8] ne '1_4' || $arrcopy[9] ne '2_4';
 
    $vr = $sp->hash(    i_1 => 'yo1',  we_1 => 'al1');
    $vr = $sp->hash(   'i_2',  'yo2', 'we_2',  'al2');
@@ -696,37 +700,31 @@ repository, which is located at C<git.code.sf.net/p/ssymobj/code>.
    $vr = $sp->hash([qw(i_4    yo4     we_4     al4)]);
    $vr = $sp->hash({   i_5 => 'yo5',  we_5 => 'al5'});
    my %hashcopy = $sp->hash(); # wantarray context gives copy instead
-   die "hashcopy"
-      if ($hashcopy{hk1} ne 'hv1' || $hashcopy{hk2} ne 'hv2' ||
-         $hashcopy{i_1} ne 'yo1' || $hashcopy{we_1} ne 'al1' ||
-         $hashcopy{i_2} ne 'yo2' || $hashcopy{we_2} ne 'al2' ||
-         $hashcopy{i_3} ne 'yo3' || $hashcopy{we_3} ne 'al3' ||
-         $hashcopy{i_4} ne 'yo4' || $hashcopy{we_4} ne 'al4' ||
-         $hashcopy{i_5} ne 'yo5' || $hashcopy{we_5} ne 'al5');
+   die "hashcopy" if $hashcopy{hk1} ne 'hv1' || $hashcopy{hk2} ne 'hv2' ||
+      $hashcopy{i_1} ne 'yo1' || $hashcopy{we_1} ne 'al1' ||
+      $hashcopy{i_2} ne 'yo2' || $hashcopy{we_2} ne 'al2' ||
+      $hashcopy{i_3} ne 'yo3' || $hashcopy{we_3} ne 'al3' ||
+      $hashcopy{i_4} ne 'yo4' || $hashcopy{we_4} ne 'al4' ||
+      $hashcopy{i_5} ne 'yo5' || $hashcopy{we_5} ne 'al5';
 
-   SymObj::obj_dump($sp);
-
-   ## Adjust per-class template (but don't do that, and like that) ##
+   print "## Adjust per-class template (but don't do that / like that) ##\n";
 
    undef %{X_Super::hash()};
    X_Super::hash(newhk1=>'newhv1', newhk2=>'newhv2');
    $sp = SomePack->new(name => 'SymObj is really easy');
-   die "X_Super::hash messed"
-      if ($sp->name ne 'SymObj is really easy' ||
-         $sp->hash->{newhk1} ne 'newhv1' ||
-         $sp->hash->{newhk2} ne 'newhv2');
+   die "X_Super::hash messed" if $sp->name ne 'SymObj is really easy' ||
+      $sp->hash->{newhk1} ne 'newhv1' || $sp->hash->{newhk2} ne 'newhv2';
 
-   ## No-access/readonly accessors; "user constructors" ##
+   print "## No-access/readonly accessors; \"user constructors\" ##\n";
 
    {package FC1;
       BEGIN {
-         SymObj::sym_create(0, { '?_n' => 'FC1', '!_v' => '1' },
-            sub {
-               my ($self, $pkg) = @_;
-               print ".. FC1::{__ctor}(): (", ${$self->__n}, ")\n";
-            });
+         SymObj::sym_create(0, { '?_n' => 'FC1', '!_v' => '1' }, '__xtor');
       }
-   }
+      sub __xtor {
+         my ($self, $pkg) = @_;
+         print ".. FC1::{__xtor}(): (", ${$self->__n}, ")\n";
+      }}
    {package FC2;
       our (@ISA);
       BEGIN {
@@ -736,16 +734,111 @@ repository, which is located at C<git.code.sf.net/p/ssymobj/code>.
       sub __ctor {
          my ($self, $pkg) = @_;
          print ".. FC2::__ctor(): (", ${$self->__n}, ")\n";
-      }
-   }
+      }}
 
    my $i = FC2->new;
    die "FC2, 1" if $i->v ne '2';
    $i->v('it is readonly..');
    $i->n('no accessor for this at all..');
-   FC2::n('Class static data, updated (but do not do that)');
+   FC2::n('Class static data, updated (but..do not)');
    $i = FC2->new(v=>3);
    die "FC2, 1" if $i->v ne '3';
+
+   print "## MI, deep tree  ##\n";
+
+   {package T1_0;
+      BEGIN {
+         SymObj::sym_create(0, { _i1 => 'T1_0', _n => 'T1_0', _v => 1 },
+            sub { my ($self, $pkg) = @_;
+                  print ".. T1_0: (iX=${$self->__i1}, n=${$self->__n})\n"; });
+      }}
+   {package T1_1;
+      our (@ISA);
+      BEGIN {
+         @ISA = (qw(T1_0));
+         SymObj::sym_create(0, { _i2 => 'T1_1', _n => 'T1_1', _v => 2 },
+            sub { my ($self, $pkg) = @_;
+                  print ".. T1_1: (iX=${$self->__i2}, n=${$self->__n})\n"; });
+      }}
+   {package T1_2;
+      our (@ISA);
+      BEGIN {
+         @ISA = (qw(T1_1));
+         SymObj::sym_create(0, { _i3 => 'T1_2', _n => 'T1_2', _v => 3 },
+            sub { my ($self, $pkg) = @_;
+                  print ".. T1_2: (iX=${$self->__i3}, n=${$self->__n})\n"; });
+      }}
+
+   {package T2_0;
+      BEGIN {
+         SymObj::sym_create(0, { _i4 => 'T2_0', _n => 'T2_0', _v => 4 },
+            sub { my ($self, $pkg) = @_;
+                  print ".. T2_0: (iX=${$self->__i4}, n=${$self->__n})\n"; });
+      }}
+   {package T2_1;
+      our (@ISA);
+      BEGIN {
+         @ISA = (qw(T2_0));
+         SymObj::sym_create(0, { _i5 => 'T2_1', _n => 'T2_1', _v => 5 },
+            sub { my ($self, $pkg) = @_;
+                  print ".. T2_1: (iX=${$self->__i5}, n=${$self->__n})\n"; });
+      }}
+
+   {package TX;
+      our (@ISA);
+      BEGIN {
+         @ISA = (qw(T1_2 T2_1));
+         SymObj::sym_create(0, { _ix => 'TX', _n => 'TX', _v => 1000 },
+            sub { my ($self, $pkg) = @_;
+                  print ".. TX: (iX=${$self->__ix}, n=${$self->__n})\n"; });
+      }}
+
+   $i = TX->new;
+   die "TX" if $i->n ne 'TX' || $i->v != 1000 || $i->i1 ne 'T1_0' ||
+      $i->i2 ne 'T1_1' || $i->i3 ne 'T1_2' || $i->i4 ne 'T2_0' ||
+      $i->i5 ne 'T2_1';
+
+   print "## MI, deep tree, with non S-SymObj-managed classes ##\n";
+
+   {package TF_0;
+      sub new {
+         my $class = shift;
+         my $self = { _i4 => 'TF_0', _n => 'TF_0', _v => 4 };
+         bless $self, $class;
+      }
+      sub i4 { my $self = shift; $self->{_i4}; }
+   }
+   {package TF_1;
+      our (@ISA);
+      BEGIN {
+         @ISA = (qw(TF_0));
+      }
+      sub new {
+         my $class = shift;
+         my $self = $class->SUPER::new(); 
+         $self->{_i5} = 'TF_1';
+         $self->{_n} = 'TF_1';
+         $self->{_v} = 4;
+         bless $self, $class;
+      }
+      sub i5 { my $self = shift; $self->{_i5}; }
+   }
+
+   {package TFX;
+      our (@ISA);
+      BEGIN {
+         @ISA = (qw(T1_2 TF_1));
+         SymObj::sym_create(0, { _ix => 'TFX', _n => 'TFX', _v => 2000 },
+            sub { my ($self, $pkg) = @_;
+                  print ".. TFX: (iX=${$self->__ix}, n=${$self->__n})\n"; });
+      }}
+
+   $i = TFX->new;
+   die "TFX" if $i->n ne 'TFX' || $i->v != 2000 || $i->i1 ne 'T1_0' ||
+      $i->i2 ne 'T1_1' || $i->i3 ne 'T1_2' || $i->i4 ne 'TF_0' ||
+      $i->i5 ne 'TF_1';
+
+   print "## I don't know why you say goodbye, S-SymObj says hello ##\n";
 
 =head2 Package-Symbols
 
@@ -822,11 +915,11 @@ the global L<"Debug"> state on these basis.
 
 C<$3> is the optional per-object user constructor, which can be used
 to perform additional setup of C<$self> as necessary.  These user
-constructors take one arguments, C<$self>, the newly created object.
-(Well, maybe partially created up to some point in C<@ISA>.) The user
+constructors take one argument, C<$self>, the newly created object.
+(Well, maybe partially created up to some point in C<@ISA>.)  The user
 constructor doesn not have a return value.
 
-If C<$3> is used, it must be either a code-reference or a string.  In
+If C<$3> is used, it must either be a code-reference or a string.  In
 the latter case S-SymObj will try to locate a method of the given name
 once the first object of the managed type is created, and set this to
 be the user constructor.  If C<$3> is not used, S-SymObj will look for
@@ -834,31 +927,29 @@ a method named C<__ctor> once the first object of the managed type
 is created.  I<Note> that the string and auto-search case introduce
 races in multithreaded programs, though it shouldn't hurt that much
 in practice.  If in doubt, pass a code-reference.
-even if no fields exist, yet even if C<$2> is the empty anonymous C<{}>
-hash (as shown above).
 
 SymObj generally "enforces" privacy (by definition) via an underscore
 prefix: all keys of C<$2> are expected to start with an underscore,
 but the public accessor methods will miss that (C<_data> becomes
 C<data>).
 
-The created accessor subs work as methods if a C<$self> object exists
-(as in C<$self-E<gt>name()>) and as functions otherwise
+The created accessor subs work as methods if the first argument that
+is seen is a reference that seems to be a class instantiation (i.e.,
+C<$self>, as in C<$self-E<gt>name()>) and as functions otherwise
 (C<SomePack::name()>), in which case the provided package template
 hash (C<$2>) is used!  (Note that no locking is performed in the latter
-case, i.e., this should not be done in multithreaded programs.)
-If they act upon arrays or hashs they'll return references to the
-members by default, but do return copies in C<wantarray> context
-instead.
+case, i.e., this should not be done in multithreaded programs.)  If
+they act upon arrays or hashs they'll return references to the members
+by default, but do return copies in C<wantarray> context instead.
 
 If a key in C<$2> is prefixed with an AT or a PERCENT, as in C<'@_name'>
-or C<'%_name'>, then the field in question is assumed to be an array
-or hash, respectively.  By default S-SymObj uses the value to figure
-out which kind of accessor has to be used, but for that the value must
-be set to a value different to C<undef>, which sometimes is not desired,
-i.e., sometimes a field should be lazy allocated, only if it is really
-used.  Note that the generic accessors will automatically instantiate
-an empty array/hash as necessary.
+or C<'%_name'>, respectively, then the field in question is assumed
+to be an array or hash, respectively.  By default S-SymObj uses the
+value to figure out which kind of accessor has to be used, but for
+that the value must be set to a value different than C<undef>, which
+is not desirable sometimes, i.e., when a field should be lazy allocated,
+only if it is really used.  Note that the generic accessors will
+automatically instantiate an empty array/hash as necessary.
 
 After the (optional) C<@> or C<%> type modifier, one may use (also
 optionally) C<?> or C<!>, mutually exclusive, as an access modifier.
@@ -871,7 +962,7 @@ this case.
 Whatever type and/or access modifier(s) was/were present, they will
 be stripped from the field name, just like a following underscore will,
 i.e., a field C<'@!_name'> will actually end up as C<_name> in the
-class-static hash, with an accessor named C<name>.
+class-static hash, with an accessor sub named C<name>.
 
 In addition to those accessor subs there will I<always> be private
 accessor subs be created which use the public name prefixed with two
@@ -905,7 +996,8 @@ The C<__PACKAGE__>.
 =item C<$_SymObj_ISA>
 
 A copy of the class's C<@ISA>, in reversed order and including the
-class itself.
+class itself.  This is the entire unfolded class tree indeed, unfolded
+in down-top, left-right order.
 
 =item C<$_SymObj_ALL_CTOR_ARGS>
 
