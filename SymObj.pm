@@ -75,26 +75,9 @@ sub sym_create { # {{{
    # Note that our @isa<->*_SymObj_ISA is in reversed order.
    $flags |= _CLEANHIER;
    if (defined ${"${pkg}::"}{ISA}) {
-      foreach $i (@{${"${pkg}::"}{ISA}}) {
-         unless (defined %{"${i}::"}) {
-            print $MsgFH "${pkg}: \@ISA contains non-existent class '$i'!\n"
-               if $flags & DEBUG;
-            next;
-         }
-         unshift @isa, $i;
-
-         $j = ${"${i}::"}{_SymObj_FLAGS};
-         unless (defined $j) {
-            print $MsgFH "${pkg}: \@ISA entry '$i' is not a SymObj managed ",
-               "class, that's no good and very slow!\n" if $flags & DEBUG;
-            $flags &= ~_CLEANHIER;
-            next;
-         }
-         $flags |= $j & (DEBUG | VERBOSE); # Inherit debug states
-         $flags &= ~_CLEANHIER if ! ($j & _CLEANHIER);
-
-         $j = ${"${i}::"}{_SymObj_ALL_CTOR_ARGS};
-         while (my ($k, $v) = each %$j) {
+      _resolve_tree($pkg, \%actorargs, $pkg, \$flags, \@isa);
+      foreach my $c (@isa) {
+         while (my ($k, $v) = each %{${"${c}::"}{_SymObj_ALL_CTOR_ARGS}}) {
             $actorargs{$k} = $v;
          }
       }
@@ -338,7 +321,7 @@ sub _ctor_dbg { # {{{
       $argaref->[0] eq _UUID;
 
    # Inheritance handling
-   if (defined(my $isa = ${"${pkg}::"}{ISA})) {
+   if (defined ${"${pkg}::"}{ISA}) {
       # Append overrides
       foreach $k (@$ctorovers) {
          for ($i = $init_chain, $j = @$argaref; $i < $j; $i += 2) {
@@ -349,16 +332,16 @@ sub _ctor_dbg { # {{{
 j_OVW:}
 
       # Walk the new() chain, but disallow arg-checking for superclasses
-      unshift(@$argaref, _UUID) if ! $init_chain;
+      unshift @$argaref, _UUID if ! $init_chain;
 
-      foreach (@$isa) {
-         unless (defined ${"${_}::"}{new}) {
-            print $MsgFH "${pkg}: $class->new(): no such package: $_!\n"
-               and next unless defined *{"${_}::"};
-            print $MsgFH "${pkg}: $class->new(): $_: misses a new() sub!\n";
+      foreach my $c (@{${"${pkg}::"}{ISA}}) {
+         unless (defined ${"${c}::"}{new}) {
+            print $MsgFH "${pkg}: $class->new(): no such package: $c!\n"
+               and next unless defined %{"${c}::"};
+            print $MsgFH "${pkg}: $class->new(): $c: misses a new() sub!\n";
             next;
          }
-         $i = &{${"${_}::"}{new}}($class, @$argaref);
+         $i = &{${"${c}::"}{new}}($class, @$argaref);
 
          # (MI restriction applies here: if $self is yet a {} the other tree
          # can only be joined in and thus looses it's hash-pointer)
@@ -441,17 +424,21 @@ sub _ctor_dirtyhier { # (Stripped version of _dbg) {{{
       (undef, ${"${pkg}::"}{_SymObj_ALL_CTOR_ARGS},
       ${"${pkg}::"}{_SymObj_CTOR_OVERRIDES}, ${"${pkg}::"}{_SymObj_FIELDS});
 
-   if (defined(my $isa = ${"${pkg}::"}{ISA})) {
+   if (defined ${"${pkg}::"}{ISA}) {
       foreach $k (@$ctorovers) {
-         for ($i = $init_chain, $j = @$argaref; $i < $j; $i += 2) {
+         for ($i = 0, $j = @$argaref; $i < $j; $i += 2) {
             goto j_OVW if $k eq $$argaref[$i];
          }
          push @$argaref, $k;
          push @$argaref, $tfields->{'_' . $k};
 j_OVW:}
 
-      foreach (@$isa) {
-         $i = &{${"${_}::"}{new}}($class, @$argaref);
+      foreach my $c (@{${"${pkg}::"}{ISA}}) {
+         unless (defined ${"${c}::"}{new}) {
+            next;
+         }
+         $i = &{${"${c}::"}{new}}($class, @$argaref);
+
          $self = $i and next unless defined $self;
          while (($k, $j) = each %$i) { $self->{$k} = $j; }
       }
@@ -469,9 +456,9 @@ j_OVW:}
       }
       next unless exists $tfields->{$i};
 
-      if (ref $actorargs->{$i} eq 'ARRAY') {
+      if (ref $tfields->{$i} eq 'ARRAY') {
          $self->_SymObj_ArraySet('new()', $i, $j);
-      } elsif (ref $actorargs->{$i} eq 'HASH') {
+      } elsif (ref $tfields->{$i} eq 'HASH') {
          unless (ref $j eq 'ARRAY' || ref $j eq 'HASH') {
             next;
          }
@@ -496,7 +483,6 @@ j_OVW:}
       }
    }
 
-   # Call further init code, if defined
    if (defined($i = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
       &$i($self);
    }
@@ -551,6 +537,35 @@ sub _ctor_cleanhier { # {{{
       }
    }
    $self;
+} # }}}
+
+sub _resolve_tree { # {{{
+   my ($pkg, $_actorargs, $_p, $_f, $_isa) = @_;
+   foreach my $c (@{${"${_p}::"}{ISA}}) {
+      unless (defined %{"${c}::"}) {
+         print $MsgFH "${pkg}: $_p: \@ISA contains non-existent ",
+            "class '$c'!\n" if $$_f & DEBUG;
+         next;
+      }
+      push @$_isa, $c;
+
+      my $j = ${"${c}::"}{_SymObj_FLAGS};
+      unless (defined $j) {
+         print $MsgFH "${pkg}: $_p: superclass '$c' not S-SymObj ",
+            "managed, optimized ctor won't be used!\n" if $$_f & DEBUG;
+         $$_f &= ~_CLEANHIER;
+         next;
+      }
+      $$_f |= $j & (DEBUG | VERBOSE); # Inherit debug states
+      $$_f &= ~_CLEANHIER if ! ($j & _CLEANHIER);
+
+      while (my ($k, $v) = each %{${"${c}::"}{_SymObj_ALL_CTOR_ARGS}}) {
+         $_actorargs->{$k} = $v;
+      }
+
+      _resolve_tree($pkg, $_actorargs, $c, $_f, $_isa)
+         if defined ${"${c}::"}{ISA};
+   }
 } # }}}
 
 sub _complain_exclude {
