@@ -114,7 +114,7 @@ The example from the POD as of 2012-08-29: ::
       sub __ctor { my $self = shift; print "X4 user ctor (no retval)\n"; }
    }
    $o = X4->new(name => 'A X4');
-   die 'Lazy-allocation failed' if defined $o->hash2 || defined $o->array2;
+   die 'Lazy-allocation failed' if ! defined $o->hash2 || ! defined $o->array2;
    print join(' ', keys %{$o->hash2(Allocation=>1, Lazy=>1)}), ' ';
    print join(' ', @{$o->array2(qw(Can Be Used))}), "\n";
 

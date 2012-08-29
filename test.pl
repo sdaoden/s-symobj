@@ -1,5 +1,5 @@
 #@ Automated test for S-SymObj (make test)
-use Test::Simple tests => 32;
+use Test::Simple tests => 35;
 
 BEGIN { require SymObj; $SymObj::Debug = 0; }
 my ($o, $v, @va, %ha, $m);
@@ -15,6 +15,12 @@ my ($o, $v, @va, %ha, $m);
 }
 {package X2;
    our (@ISA); BEGIN { @ISA = ('X1'); SymObj::sym_create(0, {}); }
+}
+{package X3;
+   our (@ISA); BEGIN { @ISA = ('X2');
+      SymObj::sym_create(0, { _name => 'X3 override',
+         '@_array' => undef, '%_hash' => undef });
+   }
 }
 
 $o = X2->new(name => 'EASY T1');
@@ -74,6 +80,11 @@ ok($ha{hk1} eq 'hv1' && $ha{hk2} eq 'hv2' &&
    $ha{i_3} eq 'yo3' && $ha{we_3} eq 'al3' &&
    $ha{i_4} eq 'yo4' && $ha{we_4} eq 'al4' &&
    $ha{i_5} eq 'yo5' && $ha{we_5} eq 'al5');
+
+$o = X3->new;
+ok($o->name eq 'X3 override');
+ok(defined $o->array && defined $o->hash);
+ok(ref $o->array eq 'ARRAY' && ref $o->hash eq 'HASH');
 
 ##
 
@@ -203,5 +214,7 @@ ok($o->n eq 'C' && $o->v == 13 && $o->i1 eq 'C111' && $o->i2 eq 'C112' &&
    $o->i6 eq 'C211' && $o->i7 eq 'C2121' && $o->i8 eq 'C212' &&
    $o->i9 eq 'C21' && $o->i10 eq 'C221' && $o->i11 eq 'C22' &&
    $o->i12 eq 'C2' && $o->i13 eq 'C');
+
+# FIXME CHECK MIXED HIERS
 
 # vim:set fenc=utf-8 syntax=perl ts=8 sts=3 sw=3 et tw=79:

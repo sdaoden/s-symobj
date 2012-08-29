@@ -203,7 +203,7 @@ sub sym_create { # {{{
       # No it is not, we're the first..
       $actorargs{$pj} = \$tfields->{$xj};
 
-      # Hope for perl(1) to eventually optimize away the TYPE_* conditions..
+      # Hope that perl(1) optimizes away the TYPE_* conditions..
       if (($tj & TYPE_ARRAY) || $i eq 'ARRAY') {
          print $MsgFH "\tsub $pj: array-based\n" if $flags & VERBOSE;
          *{"${pkg}::__$pj"} = sub { $_[0]->{$xj}; };
@@ -219,9 +219,9 @@ sub sym_create { # {{{
                $self = $tfields;
             }
             my $f = $self->{$xj};
-            if (@_ > 0) {
+            if (! defined $f || @_) {
                SymObj::_complain_rdonly($pkg, $pj)
-                  if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
+                  if ($tj & TYPE_RDONLY) && @_ && ($flags & DEBUG);
                $f = "${pkg}::_SymObj_ArraySet"->($self, $pj, $xj, @_);
             }
             wantarray ? @$f : $f;
@@ -241,9 +241,9 @@ sub sym_create { # {{{
                $self = $tfields;
             }
             my $f = $self->{$xj};
-            if (@_ > 0) {
+            if (! defined $f || @_) {
                SymObj::_complain_rdonly($pkg, $pj)
-                  if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
+                  if ($tj & TYPE_RDONLY) && @_ && ($flags & DEBUG);
                $f = &{${"${pkg}::"}{_SymObj_HashSet}}($self, $pj, $xj, @_);
             }
             wantarray ? %$f : $f;
@@ -264,7 +264,7 @@ sub sym_create { # {{{
             } else {
                $self = $tfields;
             }
-            if (@_ > 0) {
+            if (@_) {
                SymObj::_complain_rdonly($pkg, $pj)
                   if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
                $self->{$xj} = shift;
@@ -601,7 +601,7 @@ __END__
 
 =head1 NAME
 
-SymObj - S-SymObj, an easy way to create symbol-tables and objects.
+S-SymObj -- an easy way to create symbol-tables and objects.
 
 =head1 SYNOPSIS
 
@@ -651,7 +651,7 @@ SymObj - S-SymObj, an easy way to create symbol-tables and objects.
       sub __ctor { my $self = shift; print "X4 user ctor (no retval)\n"; }
    }
    $o = X4->new(name => 'A X4');
-   die 'Lazy-allocation failed' if defined $o->hash2 || defined $o->array2;
+   die 'Lazy-allocation failed' if ! defined $o->hash2 || ! defined $o->array2;
    print join(' ', keys %{$o->hash2(Allocation=>1, Lazy=>1)}), ' ';
    print join(' ', @{$o->array2(qw(Can Be Used))}), "\n";
 
