@@ -1,9 +1,10 @@
 #@ Automated test for S-SymObj (make test)
-use Test::Simple tests => 17;
+use Test::Simple tests => 32;
 
 BEGIN { require SymObj; $SymObj::Debug = 0; }
 my ($o, $v, @va, %ha, $m);
 
+##
 
 {package X1;
    BEGIN {
@@ -74,6 +75,7 @@ ok($ha{hk1} eq 'hv1' && $ha{hk2} eq 'hv2' &&
    $ha{i_4} eq 'yo4' && $ha{we_4} eq 'al4' &&
    $ha{i_5} eq 'yo5' && $ha{we_5} eq 'al5');
 
+##
 
 %{X1::hash()} = ();
 X1::hash(newhk1=>'newhv1', newhk2=>'newhv2');
@@ -81,6 +83,7 @@ $o = X2->new(name => 'EASY T3');
 ok($o->name eq 'EASY T3' && $o->hash->{newhk1} eq 'newhv1' &&
    $o->hash->{newhk2} eq 'newhv2');
 
+##
 
 {package T1_0;
    BEGIN {
@@ -122,8 +125,83 @@ ok($o->n eq 'TX' && $o->v == 1000 && $o->i1 eq 'T1_0' &&
    $o->i2 eq 'T1_1' && $o->i3 eq 'T1_2' && $o->i4 eq 'T2_0' &&
    $o->i5 eq 'T2_1');
 
-# FIXME test without $Debug (optimized path) won't work due to _SymObj_ISA
-# FIXME order, add a splitted (Y) hierarchy test (use TX as head of one super
-# FIXME path, subclassed by TX1, then add another straight (or resue T1_ !)
-# FIXME as second @ISA entry!  If that works, handling is right.
+##
 
+{package C111;
+   BEGIN {
+      SymObj::sym_create(0, { _i1 => 'C111', _n => 'C111', _v => 1 },
+         sub {my $self=shift; ::ok($m==0b000000000000); $m|=0b000000000001; });
+   }}
+{package C112;
+   BEGIN {
+      SymObj::sym_create(0, { _i2 => 'C112', _n => 'C112', _v => 2 },
+         sub {my $self=shift; ::ok($m==0b000000000001); $m|=0b000000000010; });
+   }}
+{package C11;
+   our (@ISA); BEGIN { @ISA = (qw(C111 C112));
+      SymObj::sym_create(0, { _i3 => 'C11', _n => 'C11', _v => 3 },
+         sub {my $self=shift; ::ok($m==0b000000000011); $m|=0b000000000100; });
+   }}
+{package C12;
+   BEGIN {
+      SymObj::sym_create(0, { _i4 => 'C12', _n => 'C12', _v => 4 },
+         sub {my $self=shift; ::ok($m==0b000000000111); $m|=0b000000001000; });
+   }}
+{package C1;
+   our (@ISA); BEGIN { @ISA = (qw(C11 C12));
+      SymObj::sym_create(0, { _i5 => 'C1', _n => 'C1', _v => 5 },
+         sub {my $self=shift; ::ok($m==0b000000001111); $m|=0b000000010000; });
+   }}
+
+{package C211;
+   BEGIN {
+      SymObj::sym_create(0, { _i6 => 'C211', _n => 'C211', _v => 6 },
+         sub {my $self=shift; ::ok($m==0b000000011111); $m|=0b000000100000; });
+   }}
+{package C2121;
+   BEGIN {
+      SymObj::sym_create(0, { _i7 => 'C2121', _n => 'C2121', _v => 7 },
+         sub {my $self=shift; ::ok($m==0b000000111111); $m|=0b000001000000; });
+   }}
+{package C212;
+   our (@ISA); BEGIN { @ISA = (qw(C2121));
+      SymObj::sym_create(0, { _i8 => 'C212', _n => 'C212', _v => 8 },
+         sub {my $self=shift; ::ok($m==0b000001111111); $m|=0b000010000000; });
+   }}
+{package C21;
+   our (@ISA); BEGIN { @ISA = (qw(C211 C212));
+      SymObj::sym_create(0, { _i9 => 'C21', _n => 'C21', _v => 9 },
+         sub {my $self=shift; ::ok($m==0b000011111111); $m|=0b000100000000; });
+   }}
+{package C221;
+   BEGIN {
+      SymObj::sym_create(0, { _i10 => 'C221', _n => 'C221', _v => 10 },
+         sub {my $self=shift; ::ok($m==0b000111111111); $m|=0b001000000000; });
+   }}
+{package C22;
+   our (@ISA); BEGIN { @ISA = (qw(C221));
+      SymObj::sym_create(0, { _i11 => 'C22', _n => 'C22', _v => 11 },
+         sub {my $self=shift; ::ok($m==0b001111111111); $m|=0b010000000000; });
+   }}
+{package C2;
+   our (@ISA); BEGIN { @ISA = (qw(C21 C22));
+      SymObj::sym_create(0, { _i12 => 'C2', _n => 'C2', _v => 12 },
+         sub {my $self=shift; ::ok($m==0b011111111111); $m|=0b100000000000; });
+   }}
+
+{package C;
+   our (@ISA); BEGIN { @ISA = (qw(C1 C2));
+      SymObj::sym_create(0, { _i13 => 'C', _n => 'C', _v => 13 },
+         sub {my $self=shift; ::ok($m==0b111111111111); $m|=0b1000000000000; });
+   }}
+
+$m = 0;
+$o = C->new;
+ok($m == 0b1111111111111);
+ok($o->n eq 'C' && $o->v == 13 && $o->i1 eq 'C111' && $o->i2 eq 'C112' &&
+   $o->i3 eq 'C11' && $o->i4 eq 'C12' && $o->i5 eq 'C1' &&
+   $o->i6 eq 'C211' && $o->i7 eq 'C2121' && $o->i8 eq 'C212' &&
+   $o->i9 eq 'C21' && $o->i10 eq 'C221' && $o->i11 eq 'C22' &&
+   $o->i12 eq 'C2' && $o->i13 eq 'C');
+
+# vim:set fenc=utf-8 syntax=perl ts=8 sts=3 sw=3 et tw=79:
