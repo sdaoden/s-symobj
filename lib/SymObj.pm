@@ -66,7 +66,7 @@ sub sym_create { # {{{
 
    # For (superior debug ctor) argument checking, create a hash of
    # public symbols (inherit those from parents first ...)
-   # Note that our @isa<->*_SymObj_ISA is in reversed order.
+   # Note that our @isa<->*_SymObj_ISA is flattened, in construction order
    $flags |= _CLEANHIER;
    if (defined ${"${pkg}::"}{ISA}) {
       _resolve_tree($pkg, \%actorargs, $pkg, \$flags, \@isa);
@@ -76,7 +76,7 @@ sub sym_create { # {{{
          }
       }
    }
-   unshift @isa, $pkg;
+   push @isa, $pkg;
 
    print $MsgFH ".. (inherited VERBOSE from superclass:) ",
       "SymObj::sym_create(): $pkg\n" if ($flags & VERBOSE) && ! $i;
@@ -527,8 +527,7 @@ sub _ctor_cleanhier { # {{{
    }
 
    # Call user CTORs in correct order..
-   for ($argaref = @$isa; $argaref-- > 0;) {
-      $pkg = $isa->[$argaref];
+   foreach $pkg (@$isa) {
       if (defined($sym = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
          &$sym($self);
       }
@@ -544,24 +543,24 @@ sub _resolve_tree { # {{{
             "class '$c'!\n" if $$_f & DEBUG;
          next;
       }
-      push @$_isa, $c;
 
       my $j = ${"${c}::"}{_SymObj_FLAGS};
       unless (defined $j) {
          print $MsgFH "${pkg}: $_p: superclass '$c' not S-SymObj ",
             "managed, optimized ctor won't be used!\n" if $$_f & DEBUG;
          $$_f &= ~_CLEANHIER;
-         next;
-      }
-      $$_f |= $j & (DEBUG | VERBOSE); # Inherit debug states
-      $$_f &= ~_CLEANHIER if ! ($j & _CLEANHIER);
+      } else {
+         $$_f |= $j & (DEBUG | VERBOSE); # Inherit debug states
+         $$_f &= ~_CLEANHIER if ! ($j & _CLEANHIER);
 
-      while (my ($k, $v) = each %{${"${c}::"}{_SymObj_ALL_CTOR_ARGS}}) {
-         $_actorargs->{$k} = $v;
+         while (my ($k, $v) = each %{${"${c}::"}{_SymObj_ALL_CTOR_ARGS}}) {
+            $_actorargs->{$k} = $v;
+         }
       }
 
       _resolve_tree($pkg, $_actorargs, $c, $_f, $_isa)
          if defined ${"${c}::"}{ISA};
+      push @$_isa, $c;
    }
 } # }}}
 
@@ -859,7 +858,7 @@ The C<__PACKAGE__>.
 
 A copy of the class's C<@ISA>, in reversed order and including the
 class itself.  This is the entire unfolded class tree indeed, unfolded
-in down-top, left-right order.
+in down-top, left-right (a.k.a construction) order.
 
 =item C<$_SymObj_ALL_CTOR_ARGS>
 
