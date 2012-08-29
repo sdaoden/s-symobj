@@ -1,4 +1,4 @@
-#@ (S-)Sym(bolic)Obj(ect) - easy creation of classes and objects thereof.
+#@ (S-)Sym(bolic)Obj(ect) - easy creation of symbol tables and objects.
 package SymObj;
 require 5.008_001;
 $VERSION = '0.6.0rc2';
@@ -20,13 +20,6 @@ _EOT
 
 # We fool around with that by definition, so this
 no strict 'refs';
-
-BEGIN {
-   #require Exporter;
-   #@ISA = qw(Exporter);
-   @EXPORT = qw(&pack_exists &sym_dump &obj_dump &sym_create
-      &DEBUG &VERBOSE $VERSION $COPYRIGHT $MsgFH $Debug);
-}
 
 sub NONE()        { 0 }
 sub DEBUG()       { 1<<0 }
@@ -607,7 +600,72 @@ sub _find_usr_ctor { # {{{
 __END__
 # POD {{{
 
-=head1 S-SymObj
+=head1 NAME
+
+SymObj - S-SymObj, an easy way to create symbol-tables and objects.
+
+=head1 SYNOPSIS
+
+   # You need to require it in a BEGIN{}..
+   BEGIN { require SymObj; $SymObj::Debug = 0; } # Try out $Debug=1 and =2..
+
+   # Accessor subs return references for hashes and arrays (except in wantarray
+   # context -- they return copies, then), scalars are returned "as-is"
+   {package X1;
+      BEGIN {
+         SymObj::sym_create(SymObj::NONE, { # (NONE is 0..)
+               _name => '', _array => [qw(Is Easy)],
+               _hash => {To => 'hv1', Use => 'hv2'} });
+      }
+   }
+   my $o = X1->new(name => 'SymObj');
+   print $o->name, ' ';
+   print join(' ', @{$o->array}), ' ';
+   print join(' ', keys %{$o->hash}), "\n";
+
+   # Unknown arguments are detected when DEBUG/VERBOSE is enabled.
+   {package X2;
+      our (@ISA); BEGIN { @ISA = ('X1');
+         SymObj::sym_create(0, {}); # <- adds no fields on its own
+      }
+   }
+   my $o = X2->new(name => 'SymObj detects some misuses', 'unknown' => 'arg');
+   print $o->name, "\n";
+
+   # Fields which mirror fieldnames of superclasses define overrides.
+   {package X3;
+      our (@ISA); BEGIN { @ISA = ('X2');
+         SymObj::sym_create(0, { '_name' => 'Auto superclass-overwrite'},
+            sub { my $self = shift; print "X3 user ctor (no retval)\n"; });
+      }
+   }
+   $o = X3->new();
+   print $o->name, "\n";
+
+   # It is possible to force creation of array/hash accessors even for undef
+   # values by using the @/% type modifiers; the objects themselves are
+   # lazy-created as necessary, then...
+   {package X4;
+      our (@ISA); BEGIN { @ISA = ('X3');
+         SymObj::sym_create(0, { '%_hash2' => undef, '@_array2' => undef});
+      }
+      sub __ctor { my $self = shift; print "X4 user ctor (no retval)\n"; }
+   }
+   $o = X4->new(name => 'A X4');
+   die 'Lazy-allocation failed' if defined $o->hash2 || defined $o->array2;
+   print join(' ', keys %{$o->hash2(Allocation=>1, Lazy=>1)}), ' ';
+   print join(' ', @{$o->array2(qw(Can Be Used))}), "\n";
+
+   %{$o->hash2} = ();
+   $o->hash2(HashAndArray => 'easy');
+   $o->hash2(qw(Accessors development));
+   $o->hash2('Really', 'is');
+   $o->hash2(['Swallow', 'possible']);
+   $o->hash2({ Anything => 'here' });
+   print join(' ', keys %{$o->hash2}), "\n";
+   # P.S.: this is also true for the constructor(s)
+
+=head1 DESCRIPTION
 
 SymObj.pm provides an easy way to create and construct symbol-tables
 and objects.  With a simple hash one defines the fields an object
@@ -638,209 +696,12 @@ well as for debug and non-debug mode (though that could be managed,
 actually).
 
 The S-SymObj project is located at
-L<https://sourceforge.net/projects/ssymobj>; since that is a SourceForge
-Beta project page, L<http://sdaoden.users.sourceforge.net/code.html>
-is maybe more interesting.  S-SymObj is developed using a git(1)
-repository, which is located at C<git.code.sf.net/p/ssymobj/code>.
+L<http://sdaoden.users.sourceforge.net/code.html>.  It is developed
+using a git(1) repository, which is located at
+C<git.code.sf.net/p/ssymobj/code> (or browse it at
+L<http://sourceforge.net/p/ssymobj/code/>).
 
-=head2 Usage example
-
-   BEGIN {
-      require 'SymObj.pm';       
-      $SymObj::Debug = 2; # Default: 1
-   }
-
-   print "## \"Feed-in and forget\" ##\n";
-
-   {package X_Super;
-      BEGIN {
-         SymObj::sym_create(SymObj::NONE, { # (NONE is 0..)
-               _name => '',
-               _array => [qw(av1 av2)],
-               _hash => {hk1 => 'hv1', hk2 => 'hv2'}
-            });
-      }}
-   {package SomePack;
-      our (@ISA);
-      BEGIN {
-         @ISA = ('X_Super');
-         SymObj::sym_create(0, {}); # <- adds no fields on its own
-      }}
-
-   my $sp = SomePack->new(name => 'SymObj is easy', 'unknown' => 'arg');
-
-   # Other possible ctor arguments to init ->array() and ->hash()
-   # array => '1' # (Need to push the rest later on)
-   # array => ['1', '2', '3', '4']
-   # array => [qw(1 2 3 4)]
-   # array => {1 => '2', 3 => '4'}
-   # hash => [qw(i you we all)]
-   # hash => {i => 'you', we => 'all'}
-
-   # The accessor subs also try to swallow everything.
-   # They return references, except for scalars (always) and in wantarray
-   # context, in which case you get a copy
-   my $v = $sp->name('SymObj is really nice to use');
-   die if $v ne 'SymObj is really nice to use';
-
-   my $vr;
-   $vr = $sp->array(   '1_1'); $sp->array('2_1');
-   $vr = $sp->array(qw( 1_2                2_2));
-   $vr = $sp->array([qw(1_3                2_3)]);
-   $vr = $sp->array(   '1_4' =>           '2_4');
-   my @arrcopy = $sp->array(); # wantarray context gives copy instead
-   die "arrcopy" if $arrcopy[0] ne 'av1' || $arrcopy[1] ne 'av2' ||
-      $arrcopy[2] ne '1_1' || $arrcopy[3] ne '2_1' || $arrcopy[4] ne '1_2' ||
-      $arrcopy[5] ne '2_2' || $arrcopy[6] ne '1_3' || $arrcopy[7] ne '2_3' ||
-      $arrcopy[8] ne '1_4' || $arrcopy[9] ne '2_4';
-
-   $vr = $sp->hash(    i_1 => 'yo1',  we_1 => 'al1');
-   $vr = $sp->hash(   'i_2',  'yo2', 'we_2',  'al2');
-   $vr = $sp->hash(qw( i_3    yo3     we_3     al3));
-   $vr = $sp->hash([qw(i_4    yo4     we_4     al4)]);
-   $vr = $sp->hash({   i_5 => 'yo5',  we_5 => 'al5'});
-   my %hashcopy = $sp->hash(); # wantarray context gives copy instead
-   die "hashcopy" if $hashcopy{hk1} ne 'hv1' || $hashcopy{hk2} ne 'hv2' ||
-      $hashcopy{i_1} ne 'yo1' || $hashcopy{we_1} ne 'al1' ||
-      $hashcopy{i_2} ne 'yo2' || $hashcopy{we_2} ne 'al2' ||
-      $hashcopy{i_3} ne 'yo3' || $hashcopy{we_3} ne 'al3' ||
-      $hashcopy{i_4} ne 'yo4' || $hashcopy{we_4} ne 'al4' ||
-      $hashcopy{i_5} ne 'yo5' || $hashcopy{we_5} ne 'al5';
-
-   print "## Adjust per-class template (but don't do that / like that) ##\n";
-
-   undef %{X_Super::hash()};
-   X_Super::hash(newhk1=>'newhv1', newhk2=>'newhv2');
-   $sp = SomePack->new(name => 'SymObj is really easy');
-   die "X_Super::hash messed" if $sp->name ne 'SymObj is really easy' ||
-      $sp->hash->{newhk1} ne 'newhv1' || $sp->hash->{newhk2} ne 'newhv2';
-
-   print "## No-access/readonly accessors; \"user constructors\" ##\n";
-
-   {package FC1;
-      BEGIN {
-         SymObj::sym_create(0, { '?_n' => 'FC1', '!_v' => '1' }, '__xtor');
-      }
-      sub __xtor {
-         my ($self, $pkg) = @_;
-         print ".. FC1::{__xtor}(): (", ${$self->__n}, ")\n";
-      }}
-   {package FC2;
-      our (@ISA);
-      BEGIN {
-         @ISA = ('FC1');
-         SymObj::sym_create(0, { '?_n' => 'FC2', '!_v' => '2' });
-      }
-      sub __ctor {
-         my ($self, $pkg) = @_;
-         print ".. FC2::__ctor(): (", ${$self->__n}, ")\n";
-      }}
-
-   my $i = FC2->new;
-   die "FC2, 1" if $i->v ne '2';
-   $i->v('it is readonly..');
-   $i->n('no accessor for this at all..');
-   FC2::n('Class static data, updated (but..do not)');
-   $i = FC2->new(v=>3);
-   die "FC2, 1" if $i->v ne '3';
-
-   print "## MI, deep tree  ##\n";
-
-   {package T1_0;
-      BEGIN {
-         SymObj::sym_create(0, { _i1 => 'T1_0', _n => 'T1_0', _v => 1 },
-            sub { my ($self, $pkg) = @_;
-                  print ".. T1_0: (iX=${$self->__i1}, n=${$self->__n})\n"; });
-      }}
-   {package T1_1;
-      our (@ISA);
-      BEGIN {
-         @ISA = (qw(T1_0));
-         SymObj::sym_create(0, { _i2 => 'T1_1', _n => 'T1_1', _v => 2 },
-            sub { my ($self, $pkg) = @_;
-                  print ".. T1_1: (iX=${$self->__i2}, n=${$self->__n})\n"; });
-      }}
-   {package T1_2;
-      our (@ISA);
-      BEGIN {
-         @ISA = (qw(T1_1));
-         SymObj::sym_create(0, { _i3 => 'T1_2', _n => 'T1_2', _v => 3 },
-            sub { my ($self, $pkg) = @_;
-                  print ".. T1_2: (iX=${$self->__i3}, n=${$self->__n})\n"; });
-      }}
-
-   {package T2_0;
-      BEGIN {
-         SymObj::sym_create(0, { _i4 => 'T2_0', _n => 'T2_0', _v => 4 },
-            sub { my ($self, $pkg) = @_;
-                  print ".. T2_0: (iX=${$self->__i4}, n=${$self->__n})\n"; });
-      }}
-   {package T2_1;
-      our (@ISA);
-      BEGIN {
-         @ISA = (qw(T2_0));
-         SymObj::sym_create(0, { _i5 => 'T2_1', _n => 'T2_1', _v => 5 },
-            sub { my ($self, $pkg) = @_;
-                  print ".. T2_1: (iX=${$self->__i5}, n=${$self->__n})\n"; });
-      }}
-
-   {package TX;
-      our (@ISA);
-      BEGIN {
-         @ISA = (qw(T1_2 T2_1));
-         SymObj::sym_create(0, { _ix => 'TX', _n => 'TX', _v => 1000 },
-            sub { my ($self, $pkg) = @_;
-                  print ".. TX: (iX=${$self->__ix}, n=${$self->__n})\n"; });
-      }}
-
-   $i = TX->new;
-   die "TX" if $i->n ne 'TX' || $i->v != 1000 || $i->i1 ne 'T1_0' ||
-      $i->i2 ne 'T1_1' || $i->i3 ne 'T1_2' || $i->i4 ne 'T2_0' ||
-      $i->i5 ne 'T2_1';
-
-   print "## MI, deep tree, with non S-SymObj-managed classes ##\n";
-
-   {package TF_0;
-      sub new {
-         my $class = shift;
-         my $self = { _i4 => 'TF_0', _n => 'TF_0', _v => 4 };
-         bless $self, $class;
-      }
-      sub i4 { my $self = shift; $self->{_i4}; }
-   }
-   {package TF_1;
-      our (@ISA);
-      BEGIN {
-         @ISA = (qw(TF_0));
-      }
-      sub new {
-         my $class = shift;
-         my $self = $class->SUPER::new(); 
-         $self->{_i5} = 'TF_1';
-         $self->{_n} = 'TF_1';
-         $self->{_v} = 4;
-         bless $self, $class;
-      }
-      sub i5 { my $self = shift; $self->{_i5}; }
-   }
-
-   {package TFX;
-      our (@ISA);
-      BEGIN {
-         @ISA = (qw(T1_2 TF_1));
-         SymObj::sym_create(0, { _ix => 'TFX', _n => 'TFX', _v => 2000 },
-            sub { my ($self, $pkg) = @_;
-                  print ".. TFX: (iX=${$self->__ix}, n=${$self->__n})\n"; });
-      }}
-
-   $i = TFX->new;
-   die "TFX" if $i->n ne 'TFX' || $i->v != 2000 || $i->i1 ne 'T1_0' ||
-      $i->i2 ne 'T1_1' || $i->i3 ne 'T1_2' || $i->i4 ne 'TF_0' ||
-      $i->i5 ne 'TF_1';
-
-   print "## I don't know why you say goodbye, S-SymObj says hello ##\n";
-
-=head2 Package-Symbols
+=head1 INTERFACE
 
 =over
 
@@ -915,9 +776,10 @@ the global L<"Debug"> state on these basis.
 
 C<$3> is the optional per-object user constructor, which can be used
 to perform additional setup of C<$self> as necessary.  These user
-constructors take one argument, C<$self>, the newly created object.
-(Well, maybe partially created up to some point in C<@ISA>.)  The user
-constructor doesn not have a return value.
+constructors take two arguments, C<$self>, the newly created object,
+and C<$pkg>, the class name of the actual (sub)class that is
+instantiated.  (Well, maybe partially created up to some point in
+C<@ISA>.)  The user constructor doesn not have a return value.
 
 If C<$3> is used, it must either be a code-reference or a string.  In
 the latter case S-SymObj will try to locate a method of the given name
@@ -939,7 +801,7 @@ C<$self>, as in C<$self-E<gt>name()>) and as functions otherwise
 (C<SomePack::name()>), in which case the provided package template
 hash (C<$2>) is used!  (Note that no locking is performed in the latter
 case, i.e., this should not be done in multithreaded programs.)  If
-they act upon arrays or hashs they'll return references to the members
+they act upon arrays or hashes they'll return references to the members
 by default, but do return copies in C<wantarray> context instead.
 
 If a key in C<$2> is prefixed with an AT or a PERCENT, as in C<'@_name'>
@@ -982,7 +844,7 @@ different access policies won't be detected.
 
 =back
 
-=head2 Private Package-Symbols
+=head1 INJECTED SYMBOLS
 
 For completeness, here is a list of all the symbols that S-SymObj
 creates internally for each managed package.
@@ -1035,6 +897,11 @@ Shared array handler, if needed.
 Shared hash handler, if needed.
 
 =back
+
+=head1 LICENSE
+
+Copyright (c) 2010 - 2012 Steffen "Daode" Nurpmeso.
+All rights reserved under the terms of the ISC license.
 
 =cut
 # }}}
