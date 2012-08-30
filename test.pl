@@ -1,10 +1,12 @@
-#@ Automated test for S-SymObj (make test)
-use Test::Simple tests => 35;
+#@ Automated test for S-SymObj (make test).
+#@ Note this should be run with $Debug=0,1,2 TODO automatize this
+
+use Test::Simple tests => 51;
 
 BEGIN { require SymObj; $SymObj::Debug = 0; }
 my ($o, $v, @va, %ha, $m);
 
-##
+## Basic: creation, field content validity, "feed-in and forget"
 
 {package X1;
    BEGIN {
@@ -19,11 +21,12 @@ my ($o, $v, @va, %ha, $m);
 {package X3;
    our (@ISA); BEGIN { @ISA = ('X2');
       SymObj::sym_create(0, { _name => 'X3 override',
-         '@_array' => undef, '%_hash' => undef });
+         '@_array2' => undef, '%_hash2' => undef });
    }
 }
 
 $o = X2->new(name => 'EASY T1');
+ok(defined $o);
 ok($o->name eq 'EASY T1');
 
 $v = $o->name('EASY T2');
@@ -83,10 +86,10 @@ ok($ha{hk1} eq 'hv1' && $ha{hk2} eq 'hv2' &&
 
 $o = X3->new;
 ok($o->name eq 'X3 override');
-ok(defined $o->array && defined $o->hash);
-ok(ref $o->array eq 'ARRAY' && ref $o->hash eq 'HASH');
+ok(defined $o->array2 && defined $o->hash2);
+ok(ref $o->array2 eq 'ARRAY' && ref $o->hash2 eq 'HASH');
 
-##
+## "Static" data update
 
 %{X1::hash()} = ();
 X1::hash(newhk1=>'newhv1', newhk2=>'newhv2');
@@ -94,7 +97,7 @@ $o = X2->new(name => 'EASY T3');
 ok($o->name eq 'EASY T3' && $o->hash->{newhk1} eq 'newhv1' &&
    $o->hash->{newhk2} eq 'newhv2');
 
-##
+## Clean straight hierarchy, ctor call order
 
 {package T1_0;
    BEGIN {
@@ -136,7 +139,7 @@ ok($o->n eq 'TX' && $o->v == 1000 && $o->i1 eq 'T1_0' &&
    $o->i2 eq 'T1_1' && $o->i3 eq 'T1_2' && $o->i4 eq 'T2_0' &&
    $o->i5 eq 'T2_1');
 
-##
+## Clean diverged hierarchy, ctor order
 
 {package C111;
    BEGIN {
@@ -215,6 +218,81 @@ ok($o->n eq 'C' && $o->v == 13 && $o->i1 eq 'C111' && $o->i2 eq 'C112' &&
    $o->i9 eq 'C21' && $o->i10 eq 'C221' && $o->i11 eq 'C22' &&
    $o->i12 eq 'C2' && $o->i13 eq 'C');
 
-# FIXME CHECK MIXED HIERS
+## Dirty diverged hierarchy (, ctor order) (reuse "C1" tree from above test)
+
+{package DSUPER;
+   sub new { my $self = {}; bless $self, shift; }
+   sub n { my $self = shift; $self->{_n}; }
+   sub v { my $self = shift; $self->{_v}; }
+   }
+
+{package D111;
+   our (@ISA); BEGIN { @ISA = (qw(DSUPER)); }
+   sub new {
+      my $class = shift;
+      my $self = $class->SUPER::new();
+      ::ok($m==0b000000011111); $m|=0b000000100000;
+      $self->{_i6} = 'D111'; $self->{_n} = 'D111'; $self->{_v} => 6;
+      bless $self, $class;
+   }
+   sub i6 { my $self = shift; $self->{_i6}; }
+   }
+{package D1121;
+   BEGIN {
+      SymObj::sym_create(0, { _i7 => 'D1121', _n => 'D1121', _v => 7 },
+         sub {my $self=shift; ::ok($m==0b000000111111); $m|=0b000001000000; });
+   }}
+{package D112;
+   our (@ISA); BEGIN { @ISA = (qw(D1121));
+      SymObj::sym_create(0, { _i8 => 'D112', _n => 'D112', _v => 8 },
+         sub {my $self=shift; ::ok($m==0b000001111111); $m|=0b000010000000; });
+   }}
+{package D11;
+   our (@ISA); BEGIN { @ISA = (qw(D111 D112));
+      SymObj::sym_create(0, { _i9 => 'D11', _n => 'D11', _v => 9 },
+         sub {my $self=shift; ::ok($m==0b000011111111); $m|=0b000100000000; });
+   }}
+{package D121;
+   our (@ISA); BEGIN { @ISA = (qw(DSUPER)); }
+   sub new {
+      my $class = shift;
+      my $self = $class->SUPER::new();
+      ::ok($m==0b000111111111); $m|=0b001000000000;
+      $self->{_i10} = 'D121'; $self->{_n} = 'D121'; $self->{_v} => 10;
+      bless $self, $class;
+   }
+   sub i10 { my $self = shift; $self->{_i10}; }
+   }
+{package D12;
+   our (@ISA); BEGIN { @ISA = (qw(D121)); }
+   sub new {
+      my $class = shift;
+      my $self = $class->SUPER::new();
+      ::ok($m==0b001111111111); $m|=0b010000000000;
+      $self->{_i11} = 'D12'; $self->{_n} = 'D12'; $self->{_v} => 11;
+      bless $self, $class;
+   }
+   sub i11 { my $self = shift; $self->{_i11}; }
+   }
+{package D1;
+   our (@ISA); BEGIN { @ISA = (qw(D11 D12));
+      SymObj::sym_create(0, { _i12 => 'D1', _n => 'D1', _v => 12 },
+         sub {my $self=shift; ::ok($m==0b011111111111); $m|=0b100000000000; });
+   }}
+
+{package DC;
+   our (@ISA); BEGIN { @ISA = (qw(C1 D1));
+      SymObj::sym_create(0, { _i13 => 'DC', _n => 'DC', _v => 13 },
+         sub {my $self=shift; ::ok($m==0b111111111111); $m|=0b1000000000000; });
+   }}
+
+$m = 0;
+$o = DC->new;
+ok($m == 0b1111111111111);
+ok($o->n eq 'DC' && $o->v == 13 && $o->i1 eq 'C111' && $o->i2 eq 'C112' &&
+   $o->i3 eq 'C11' && $o->i4 eq 'C12' && $o->i5 eq 'C1' &&
+   $o->i6 eq 'D111' && $o->i7 eq 'D1121' && $o->i8 eq 'D112' &&
+   $o->i9 eq 'D11' && $o->i10 eq 'D121' && $o->i11 eq 'D12' &&
+   $o->i12 eq 'D1' && $o->i13 eq 'DC');
 
 # vim:set fenc=utf-8 syntax=perl ts=8 sts=3 sw=3 et tw=79:
