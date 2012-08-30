@@ -541,15 +541,16 @@ sub _resolve_tree { # {{{
       my $j = ${"${c}::"}{_SymObj_FLAGS};
       unless (defined $j) {
          print $MsgFH "${pkg}: $_p: superclass '$c' not S-SymObj ",
-            "managed, optimized ctor won't be used!\n" if $$_f & DEBUG;
+            "managed, optimized ctor won't be used, NOT SEARCHING FURTHER!\n"
+            if $$_f & DEBUG;
          $$_f &= ~_CLEANHIER;
-      } else {
-         $$_f |= $j & (DEBUG | VERBOSE); # Inherit debug states
-         $$_f &= ~_CLEANHIER if ! ($j & _CLEANHIER);
+         next;
+      }
+      $$_f |= $j & (DEBUG | VERBOSE); # Inherit debug states
+      $$_f &= ~_CLEANHIER if ! ($j & _CLEANHIER);
 
-         while (my ($k, $v) = each %{${"${c}::"}{_SymObj_ALL_CTOR_ARGS}}) {
-            $_actorargs->{$k} = $v;
-         }
+      while (my ($k, $v) = each %{${"${c}::"}{_SymObj_ALL_CTOR_ARGS}}) {
+         $_actorargs->{$k} = $v;
       }
 
       _resolve_tree($pkg, $_actorargs, $c, $_f, $_isa)
@@ -685,6 +686,13 @@ times in the C<@ISA> of some class; this is because the resulting
 behaviour would differ for clean S-SymObj managed and mixed trees, as
 well as for debug and non-debug mode (though that could be managed,
 actually).
+
+B<Note> that it is not possible to use an object tree with mixed
+S-SymObj managed and non-managed classes in B<mixed order>, as in
+I<MANAGED subclassof NON-MANAGED subclassof MANAGED>, because tree
+traversal actually stops once a I<NON-MANAGED> class is seen.  This
+is logical, because non-managed classes do not contain the necessary
+information for S-SymObj.
 
 The S-SymObj project is located at
 L<http://sdaoden.users.sourceforge.net/code.html>.  It is developed
