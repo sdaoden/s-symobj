@@ -68,14 +68,8 @@ sub sym_create { # {{{
    # public symbols (inherit those from parents first ...)
    # Note that our @isa<->*_SymObj_ISA is flattened, in construction order
    $flags |= _CLEANHIER;
-   if (defined ${"${pkg}::"}{ISA}) {
-      _resolve_tree($pkg, \%actorargs, $pkg, \$flags, \@isa);
-      foreach my $c (@isa) {
-         while (my ($k, $v) = each %{${"${c}::"}{_SymObj_ALL_CTOR_ARGS}}) {
-            $actorargs{$k} = $v;
-         }
-      }
-   }
+   _resolve_tree($pkg, \%actorargs, $pkg, \$flags, \@isa)
+      if defined ${"${pkg}::"}{ISA};
    push @isa, $pkg;
 
    print $MsgFH ".. (inherited VERBOSE from superclass:) ",
@@ -583,12 +577,10 @@ sub _find_usr_ctor { # {{{
    my ($self, $pkg, $ctor) = @_;
    my $flags = ${"${pkg}::"}{_SymObj_FLAGS};
    unless (defined ${"${pkg}::"}{$ctor}) {
-      print $MsgFH "${pkg}: cannot find user constructor '$ctor'\n"
-         if $flags & VERBOSE;
+      print $MsgFH "${pkg}: no user ctor\n" if $flags & VERBOSE;
       delete ${"${pkg}::"}{_SymObj_USR_CTOR};
    } else {
-      print $MsgFH "${pkg}: located user constructor '$ctor'\n"
-         if $flags & VERBOSE;
+      print $MsgFH "${pkg}: resolved user ctor '$ctor'\n" if $flags & VERBOSE;
       $ctor = ${"${pkg}::"}{$ctor};
       ${"${pkg}::"}{_SymObj_USR_CTOR} = $ctor;
       &$ctor($self);
