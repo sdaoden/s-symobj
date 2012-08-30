@@ -2,10 +2,10 @@
 package SymObj;
 require 5.008_001;
 $VERSION = '0.6.0rc2';
-$COPYRIGHT =<<_EOT;
+$COPYRIGHT =<<__EOT__;
 Copyright (c) 2010 - 2012 Steffen "Daode" Nurpmeso <sdaoden\@users.sf.net>.
 All rights reserved under the terms of the ISC license.
-_EOT
+__EOT__
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
 # copyright notice and this permission notice appear in all copies.
@@ -757,37 +757,37 @@ Dump the symbol table entries of the package or object C<$1>.
 
 This is in fact a wrapper around C<Dumper::dump>.
 
-=item C<sym_create($1=int=flags, $2=hash-ref=fields[, $3=code-ref])>
+=item C<sym_create($1=int=flags, $2=hash-ref=fields[, $3=code-ref/string])>
 
 Create accessor methods/functions in the class package from within
 which this function is called (best from within a C<BEGIN{}> block)
 for all keys of C<$2>, after inspecting and adjusting them for access
 modifiers, and do the "magic" S-SymObj symbol housekeeping, too.  C<$2>
 may be the empty anonymous hash if the class does not introduce fields
-on its own.  Note that C<$2> is internally mirrored, but I<not> deep
-copied.  It should be assumed that ownership of C<$2> is overtaken by
-S-SymObj.
+on its own.  Note that a reference to C<$2> is internally stored as
+L<"$_SymObj_FIELDS"> and used for the time being!  It should thus be
+assumed that ownership of C<$2> is overtaken by S-SymObj.
 
 C<$1> can be used to set per-class (package that is) flags, like
 L<"DEBUG"> or L<"VERBOSE">.  Flags set like that will be inherited by
 all subclasses (unless otherwise noted).  It is not possible to lower
-the global L<"Debug"> state on these basis.
+the global L<"Debug"> state on this basis.
 
 C<$3> is the optional per-object user constructor, which can be used
 to perform additional setup of C<$self> as necessary.  These user
 constructors take two arguments, C<$self>, the newly created object,
 and C<$pkg>, the class name of the actual (sub)class that is
 instantiated.  (Well, maybe partially created up to some point in
-C<@ISA>.)  The user constructor doesn not have a return value.
+C<@ISA>.)  The user constructor doesn't have a return value.
 
 If C<$3> is used, it must either be a code-reference or a string.  In
 the latter case S-SymObj will try to locate a method of the given name
 once the first object of the managed type is created, and set this to
 be the user constructor.  If C<$3> is not used, S-SymObj will look for
-a method named C<__ctor> once the first object of the managed type
-is created.  I<Note> that the string and auto-search case introduce
-races in multithreaded programs, though it shouldn't hurt that much
-in practice.  If in doubt, pass a code-reference.
+a method named C<__ctor> once the first object of the managed type is
+created.  B<Note> that the string and auto-search cases are not
+thread-protected and may thus introduce races in multithreaded programs.
+If in doubt, pass a code-reference.
 
 SymObj generally "enforces" privacy (by definition) via an underscore
 prefix: all keys of C<$2> are expected to start with an underscore,
@@ -808,9 +808,10 @@ or C<'%_name'>, respectively, then the field in question is assumed
 to be an array or hash, respectively.  By default S-SymObj uses the
 value to figure out which kind of accessor has to be used, but for
 that the value must be set to a value different than C<undef>, which
-is not desirable sometimes, i.e., when a field should be lazy allocated,
+is sometimes not desirable, e.g., when a field should be lazy allocated,
 only if it is really used.  Note that the generic accessors will
-automatically instantiate an empty array/hash as necessary.
+automatically instantiate an empty array/hash as necessary in these
+cases.
 
 After the (optional) C<@> or C<%> type modifier, one may use (also
 optionally) C<?> or C<!>, mutually exclusive, as an access modifier.
@@ -856,23 +857,24 @@ The C<__PACKAGE__>.
 
 =item C<$_SymObj_ISA>
 
-A copy of the class's C<@ISA>, in reversed order and including the
-class itself.  This is the entire unfolded class tree indeed, unfolded
-in down-top, left-right (a.k.a construction) order.
+A copy of the class's C<@ISA>, including the class itself.  This indeed
+is the entire unfolded class tree, unfolded in down-top, left-right
+(a.k.a construction) order.
 
 =item C<$_SymObj_ALL_CTOR_ARGS>
 
 A hash that includes all arguments that the constructor is allowed to
-take.
+take.  (Won't cover classes that are not managed by S-SymObj.)
 
 =item C<$_SymObj_CTOR_OVERRIDES>
 
 A list of all fields that this package overrides from superclasses.
+(Won't cover classes that are not managed by S-SymObj.)
 
 =item C<$_SymObj_FIELDS>
 
-The reference to the field hash (modified to not include field-access
-modifier characters).
+The reference to the field hash, as given to L<"sym_create"> (modified
+to not include field-access modifier characters).
 
 =item C<$_SymObj_FLAGS>
 
@@ -880,8 +882,8 @@ Some flags. :)
 
 =item C<$_SymObj_USR_CTOR>
 
-An optional field that holds a reference to the users constructor.
-(Once resolved.)
+An optional field that holds a reference to the users constructor (once
+resolved).
 
 =item C<new()>
 
@@ -889,13 +891,18 @@ The auto-generated public class constructor.
 
 =item C<_SymObj_ArraySet()>
 
-Shared array handler, if needed.
+Shared array handler, only if needed.
 
 =item C<_SymObj_HashSet()>
 
-Shared hash handler, if needed.
+Shared hash handler, only if needed.
 
 =back
+
+=head1 FUTURE DIRECTIONS
+
+Optional (flag driven) thread safety for static data access.
+Thread safety for resolving the user-constructor (maybe).
 
 =head1 LICENSE
 
