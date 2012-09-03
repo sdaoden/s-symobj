@@ -25,48 +25,40 @@ is the head of a "clean" object tree, one that is entirely managed by
 S-SymObj, then indeed a super-fast super-lean constructor implementation
 is used that'll rock your house.
 
-The S-SymObj project is located at
-http://sdaoden.users.sourceforge.net/code.html.  It is developed using
-a git(1) repository, which is located at git.code.sf.net/p/ssymobj/code
-(or browse it at http://sourceforge.net/p/ssymobj/code/).
-
-WARNING
--------
-
-S-SymObj was incompatibly rewritten with the aim of improving the use,
-more features and more speed after tag v0.5.2, which has been applied
-to draw this border of incompatibility!  If you knew S-SymObj before,
-please reread the documentation!  And please don't expect that the
-interface is really stable before the v0.6.0 release is tagged.
-On the sun side, it'll be available over CPAN from that time on!
-Thank you!
+The SymObj module is available on CPAN.  The S-SymObj project is located
+at http://sdaoden.users.sourceforge.net/code.html.  It is developed
+using a git(1) repository, which is located at
+git.code.sf.net/p/ssymobj/code (or browse it at
+http://sourceforge.net/p/ssymobj/code/).
 
 Installation
 ------------
 
-SymObj.pm is a Perl module and therefore needs to be in ``@INC`` if
-scripts should be able to find it easily.  This can either be
-accomplished by regularly installing it and thus making it a part of
-your perl(1) installation, as shown in the next paragraph, or by
-specifying a path via the ``-I`` command line option or by placing a
-path in the ``PERL5LIB`` environment variable.  The last solution is
-maybe the easiest and most flexible one. ::
+Since v0.6.0 [S-]SymObj is available on CPAN as SymObj.  Please see
+the standard ``$ man 1 cpan`` (and maybe ``$ man 1 perlmodinstall``)
+manual(s) for how to perform a regular installation from CPAN.
+In short: ``$ cpan SymObj``.
 
-   $ perl Makefile.PL
-   $ make
-   $ make test
-   $ make install
+But In general SymObj.pm is a Perl module and therefore needs to be
+in ``@INC`` if scripts should be able to find it easily.  This can be
+accomplished by placing the SymObj.pm somewhere and either specifying
+the path via the ``-I`` command line option, or, and that is maybe the
+easiest and most flexible solution, by placing it in the ``PERL5LIB``
+environment variable.  Here is how to do that in a Bourne/Korn/POSIX
+shell: ::
+
+   $ PERL5LIB=/PATH/TO/SymObj.pm PERL5OPT=-C
+   $ export PERL5LIB PERL5OPT
 
 Usage
 -----
 
 The complete and up-to-date documentation is part of the S-SymObj
-module itself -- if that has been regularly installed as shown above,
-then the manual should show up by typing ``$ man SymObj``, otherwise
-the ``pod2XY`` family of programs can be used directly upon SymObj.pm,
-as in ``$ pod2text SymObj.pm``.
-
-The example from the POD as of 2012-08-29: ::
+module itself -- if that has been regularly installed via CPAN as shown
+above, then the manual should show up by typing ``$ man SymObj``,
+otherwise the ``pod2XY`` family of programs can be used directly upon
+SymObj.pm, as in ``$ pod2text SymObj.pm``.  The POD example as of
+2012-08-29: ::
 
    # You need to require it in a BEGIN{}..
    BEGIN { require SymObj; $SymObj::Debug = 0; } # Try out $Debug=1 and =2..
