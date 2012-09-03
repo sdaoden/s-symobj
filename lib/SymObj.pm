@@ -18,6 +18,8 @@ __EOT__
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+#use diagnostics -verbose;
+
 # We fool around with that by definition, so this
 no strict 'refs';
 
@@ -72,8 +74,8 @@ sub sym_create { # {{{
       if defined ${"${pkg}::"}{ISA};
    push @isa, $pkg;
 
-   print $MsgFH ".. (inherited VERBOSE from superclass:) ",
-      "SymObj::sym_create(): $pkg\n" if ($flags & VERBOSE) && ! $i;
+   print $MsgFH ".. (inherited VERBOSE:) SymObj::sym_create(): $pkg\n"
+      if ($flags & VERBOSE) && ! $i;
 
    # Accessor and $tfields handling {{{
    # We use shared per-object field handler subs to minimize code blow a bit.
@@ -95,7 +97,6 @@ sub sym_create { # {{{
       *{"${pkg}::_SymObj_ArraySet"} = sub {
          my ($self, $pub, $datum) = (shift, shift, shift);
          my $dref = $self->{$datum};
-         # (Owed to lazy construction order)
          $dref = $self->{$datum} = [] unless defined $dref;
 
          foreach my $arg (@_) {
@@ -119,7 +120,6 @@ sub sym_create { # {{{
       *{"${pkg}::_SymObj_HashSet"} = sub {
          my ($self, $pub, $datum) = (shift, shift, shift);
          my $dref = $self->{$datum};
-         # (Owed to lazy construction order)
          $dref = $self->{$datum} = {} unless defined $dref;
 
          my $k = undef;
@@ -193,8 +193,6 @@ sub sym_create { # {{{
          push @ctorovers, $pj;
          # And we do have to override the function(/method) too..
       }
-
-      # No it is not, we're the first..
       $actorargs{$pj} = \$tfields->{$xj};
 
       # Hope that perl(1) optimizes away the TYPE_* conditions..
@@ -697,8 +695,8 @@ traversal actually stops once a I<NON-MANAGED> class is seen.  This
 is logical, because non-managed classes do not contain the necessary
 information for S-SymObj.
 
-The S-SymObj project is located at
-L<http://sdaoden.users.sourceforge.net/code.html>.  It is developed
+The SymObj module is available on CPAN.  The S-SymObj project is located
+at L<http://sdaoden.users.sourceforge.net/code.html>.  It is developed
 using a git(1) repository, which is located at
 C<git.code.sf.net/p/ssymobj/code> (or browse it at
 L<http://sourceforge.net/p/ssymobj/code/>).
