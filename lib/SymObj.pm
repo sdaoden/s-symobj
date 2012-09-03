@@ -599,11 +599,11 @@ S-SymObj -- an easy way to create symbol-tables and objects.
 
 =head1 SYNOPSIS
 
-   # You need to require it in a BEGIN{}..
-   BEGIN { require SymObj; $SymObj::Debug = 0; } # Try out $Debug=1 and =2..
+   # You need to require it in a BEGIN{}..; try out $Debug= 1/2
+   BEGIN { require SymObj; $SymObj::Debug = 0; }
 
-   # Accessor subs return references for hashes and arrays (except in wantarray
-   # context -- they return copies, then), scalars are returned "as-is"
+   # Accessor subs return references for hashes and arrays (but shallow
+   # copy in wantarray context) scalars are returned "as-is"
    {package X1;
       BEGIN {
          SymObj::sym_create(SymObj::NONE, { # (NONE is 0..)
@@ -622,30 +622,31 @@ S-SymObj -- an easy way to create symbol-tables and objects.
          SymObj::sym_create(0, {}); # <- adds no fields on its own
       }
    }
-   my $o = X2->new(name => 'SymObj detects some misuses', 'unknown' => 'arg');
+   my $o = X2->new(name => 'It detects some misuses', 'un' => 'known');
    print $o->name, "\n";
 
    # Fields which mirror fieldnames of superclasses define overrides.
    {package X3;
       our (@ISA); BEGIN { @ISA = ('X2');
-         SymObj::sym_create(0, { '_name' => 'Auto superclass-overwrite'},
-            sub { my $self = shift; print "X3 user ctor (no retval)\n"; });
+         SymObj::sym_create(0, { '_name' => 'Auto superclass-ovw'},
+            sub { my $self = shift; print "X3 usr ctor\n"; });
       }
    }
    $o = X3->new();
    print $o->name, "\n";
 
-   # It is possible to force creation of array/hash accessors even for undef
-   # values by using the @/% type modifiers; the objects themselves are
-   # lazy-created as necessary, then...
+   # One may enforce creation of array/hash accessors even for undef
+   # values by using the @/% type modifiers; the objects themselves
+   # are lazy-created as necessary, then...
    {package X4;
       our (@ISA); BEGIN { @ISA = ('X3');
-         SymObj::sym_create(0, { '%_hash2' => undef, '@_array2' => undef});
+         SymObj::sym_create(0, { '%_hash2'=>undef, '@_array2'=>undef });
       }
-      sub __ctor { my $self = shift; print "X4 user ctor (no retval)\n"; }
+      sub __ctor { my $self = shift; print "X4 usr ctor\n"; }
    }
    $o = X4->new(name => 'A X4');
-   die 'Lazy-allocation failed' if ! defined $o->hash2 || ! defined $o->array2;
+   die 'Lazy-allocation failed'
+      if ! defined $o->hash2 || ! defined $o->array2;
    print join(' ', keys %{$o->hash2(Allocation=>1, Lazy=>1)}), ' ';
    print join(' ', @{$o->array2(qw(Can Be Used))}), "\n";
 
