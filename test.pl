@@ -232,7 +232,7 @@ ok($o->n eq 'C' && $o->v == 13 && $o->i1 eq 'C111' && $o->i2 eq 'C112' &&
       my $class = shift;
       my $self = $class->SUPER::new();
       ::ok($m==0b000000011111); $m|=0b000000100000;
-      $self->{_i6} = 'D111'; $self->{_n} = 'D111'; $self->{_v} => 6;
+      $self->{_i6} = 'D111'; $self->{_n} = 'D111'; $self->{_v} = 6;
       bless $self, $class;
    }
    sub i6 { my $self = shift; $self->{_i6}; }
@@ -258,7 +258,7 @@ ok($o->n eq 'C' && $o->v == 13 && $o->i1 eq 'C111' && $o->i2 eq 'C112' &&
       my $class = shift;
       my $self = $class->SUPER::new();
       ::ok($m==0b000111111111); $m|=0b001000000000;
-      $self->{_i10} = 'D121'; $self->{_n} = 'D121'; $self->{_v} => 10;
+      $self->{_i10} = 'D121'; $self->{_n} = 'D121'; $self->{_v} = 10;
       bless $self, $class;
    }
    sub i10 { my $self = shift; $self->{_i10}; }
@@ -269,7 +269,7 @@ ok($o->n eq 'C' && $o->v == 13 && $o->i1 eq 'C111' && $o->i2 eq 'C112' &&
       my $class = shift;
       my $self = $class->SUPER::new();
       ::ok($m==0b001111111111); $m|=0b010000000000;
-      $self->{_i11} = 'D12'; $self->{_n} = 'D12'; $self->{_v} => 11;
+      $self->{_i11} = 'D12'; $self->{_n} = 'D12'; $self->{_v} = 11;
       bless $self, $class;
    }
    sub i11 { my $self = shift; $self->{_i11}; }
