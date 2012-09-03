@@ -1,7 +1,7 @@
 #@ (S-)Sym(bolic)Obj(ect) - easy creation of symbol tables and objects.
 package SymObj;
 require 5.008_001;
-$VERSION = '0.6.0rc2';
+$VERSION = '0.6.0';
 $COPYRIGHT =<<__EOT__;
 Copyright (c) 2010 - 2012 Steffen "Daode" Nurpmeso <sdaoden\@users.sf.net>.
 All rights reserved under the terms of the ISC license.
@@ -706,7 +706,7 @@ L<http://sourceforge.net/p/ssymobj/code/>).
 
 =over
 
-=item C<$VERSION> (string, i.e., '0.6.0rc2')
+=item C<$VERSION> (string, i.e., '0.6.0')
 
 A version string.
 
