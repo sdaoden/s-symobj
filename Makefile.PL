@@ -3,8 +3,8 @@ require 5.008_001;
 use ExtUtils::MakeMaker;
 
 WriteMakefile( 
-	'NAME'		=> 'S-SymObj',
 	'DISTNAME'	=> 'S-SymObj',
+	'NAME'		=> 'SymObj',
 	'VERSION_FROM'	=> 'lib/SymObj.pm',
 	(
 	ABSTRACT	=> 'Easy creation of symbol-tables and objects',
