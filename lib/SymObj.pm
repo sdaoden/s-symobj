@@ -540,14 +540,17 @@ sub _resolve_tree { # {{{
 
       my $j = ${"${c}::"}{_SymObj_FLAGS};
       unless (defined $j) {
-         print $MsgFH "${pkg}: $_p: superclass '$c' not S-SymObj ",
-            "managed, optimized ctor won't be used, NOT SEARCHING FURTHER!\n"
-            if $$_f & DEBUG;
+         print $MsgFH "${pkg}: $_p:  '$c' not SymObj managed: hierarchy not ",
+            "clean, STOP!\n" if $$_f & VERBOSE;
          $$_f &= ~_CLEANHIER;
          next;
       }
       $$_f |= $j & (DEBUG | VERBOSE); # Inherit debug states
-      $$_f &= ~_CLEANHIER if ! ($j & _CLEANHIER);
+      if (! ($j & _CLEANHIER) && ($$_f & _CLEANHIER)) {
+         $$_f &= ~_CLEANHIER;
+         print $MsgFH "${pkg}: $_p: '$c' says hierarchy is not clean..\n"
+            if $$_f & VERBOSE;
+      }
 
       while (my ($k, $v) = each %{${"${c}::"}{_SymObj_ALL_CTOR_ARGS}}) {
          $_actorargs->{$k} = $v;
