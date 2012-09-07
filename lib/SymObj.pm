@@ -1,8 +1,8 @@
 #@ (S-)Sym(bolic)Obj(ect) - easy creation of symbol tables and objects.
 package SymObj;
 require 5.008_001;
-$VERSION = '0.6.0';
-$COPYRIGHT =<<__EOT__;
+our $VERSION = '0.6.0';
+our $COPYRIGHT =<<__EOT__;
 Copyright (c) 2010 - 2012 Steffen "Daode" Nurpmeso <sdaoden\@users.sf.net>.
 All rights reserved under the terms of the ISC license.
 __EOT__
@@ -18,10 +18,10 @@ __EOT__
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-#use diagnostics -verbose;
-
-# We fool around with that by definition, so this
-no strict 'refs';
+use diagnostics -verbose;
+use warnings;
+use strict;
+no strict 'refs'; # We fool around with that by definition, so this
 
 sub NONE()        { 0 }
 sub DEBUG()       { 1<<0 }
@@ -34,8 +34,10 @@ sub _HAS_ALL()    { _HAS_ARRAY | _HAS_HASH }
 
 sub _CLEANHIER()  { 1<<5 }
 
-$MsgFH = *STDERR;
-$Debug = 1; # 0,1,2
+sub _UUID         { 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD'; }
+
+our $MsgFH = *STDERR;
+our $Debug = 1; # 0,1,2
 
 sub pack_exists {
    my ($pkg) = @_;
@@ -520,7 +522,7 @@ sub _ctor_cleanhier { # {{{
 
    # Call user CTORs in correct order..
    foreach $pkg (@$isa) {
-      if (defined($sym = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
+      if (defined(my $sym = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
          &$sym($self);
       }
    }
@@ -570,8 +572,6 @@ sub _complain_rdonly {
    my ($pkg, $pub) = @_;
    print $MsgFH "${pkg}::$pub(): write access to READONLY field!\n";
 }
-
-sub _UUID { 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD'; }
 
 sub _find_usr_ctor { # {{{
    # No constructor was given to sym_create(), or it was no code-ref.
