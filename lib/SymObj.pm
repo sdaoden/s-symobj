@@ -40,8 +40,7 @@ our $MsgFH = *STDERR;
 our $Debug = 1; # 0,1,2
 
 sub pack_exists {
-   my ($pkg) = @_;
-   defined %{"${pkg}::"};
+   %{"${_[0]}::"};
 }
 
 sub sym_dump {
@@ -203,7 +202,7 @@ sub sym_create { # {{{
          *{"${pkg}::__$pj"} = sub { $_[0]->{$xj}; };
          *{"${pkg}::$pj"} = sub {
             my $self = $_[0];
-            if (($self = ref $self) ne '' && defined %{"${self}::"}) {
+            if (($self = ref $self) ne '' && %{"${self}::"}) {
                $self = shift;
                if ($tj & TYPE_EXCLUDE) {
                   SymObj::_complain_exclude($pkg, $pj) if $flags & DEBUG;
@@ -225,7 +224,7 @@ sub sym_create { # {{{
          *{"${pkg}::__$pj"} = sub { $_[0]->{$xj}; };
          *{"${pkg}::$pj"} = sub {
             my $self = $_[0];
-            if (($self = ref $self) ne '' && defined %{"${self}::"}) {
+            if (($self = ref $self) ne '' && %{"${self}::"}) {
                $self = shift;
                if ($tj & TYPE_EXCLUDE) {
                   SymObj::_complain_exclude($pkg, $pj) if $flags & DEBUG;
@@ -249,7 +248,7 @@ sub sym_create { # {{{
          *{"${pkg}::__$pj"} = sub { \$_[0]->{$xj}; };
          *{"${pkg}::$pj"} = sub {
             my $self = $_[0];
-            if (($self = ref $self) ne '' && defined %{"${self}::"}) {
+            if (($self = ref $self) ne '' && %{"${self}::"}) {
                $self = shift;
                if ($tj & TYPE_EXCLUDE) {
                   SymObj::_complain_exclude($pkg, $pj) if $flags & DEBUG;
@@ -328,7 +327,7 @@ j_OVW:}
       foreach my $c (@{${"${pkg}::"}{ISA}}) {
          unless (defined ${"${c}::"}{new}) {
             print $MsgFH "${pkg}: $class->new(): no such package: $c!\n"
-               and next unless defined %{"${c}::"};
+               and next unless %{"${c}::"};
             print $MsgFH "${pkg}: $class->new(): $c: misses a new() sub!\n";
             next;
          }
@@ -532,7 +531,7 @@ sub _ctor_cleanhier { # {{{
 sub _resolve_tree { # {{{
    my ($pkg, $_actorargs, $_p, $_f, $_isa) = @_;
    foreach my $c (@{${"${_p}::"}{ISA}}) {
-      unless (defined %{"${c}::"}) {
+      unless (%{"${c}::"}) {
          print $MsgFH "${pkg}: $_p: \@ISA contains non-existent ",
             "class '$c'!\n" if $$_f & DEBUG;
          next;
@@ -905,6 +904,16 @@ Shared hash handler, only if needed.
 
 Optional (flag driven) thread safety for static data access.
 Thread safety for resolving the user-constructor (maybe).
+
+Maybe add support for class members, but the problem here is of course
+the default-argument nature of S-SymObj; we could however require
+initialization of the member with a C<package, callback> tuple to (1)
+test references of given objects (via perl(1) UNIVERSAL, then) and
+initialize default objects if none has been given by user.
+
+Finally: realize that perl(1) ships with struct and class and similar
+things which head in the very same direction as S-SymObj.  I want to
+point out that i wrote this package the hard way.  It is me.
 
 =head1 LICENSE
 
