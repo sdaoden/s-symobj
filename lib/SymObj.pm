@@ -598,17 +598,18 @@ S-SymObj -- an easy way to create symbol-tables and objects.
 
 =head1 SYNOPSIS
 
+   use diagnostics -verbose;
+   use strict;
+   use warnings;
    # You need to require it in a BEGIN{}..; try out $Debug= 1/2
    BEGIN { require SymObj; $SymObj::Debug = 0; }
 
    # Accessor subs return references for hashes and arrays (but shallow
    # copy in wantarray context) scalars are returned "as-is"
    {package X1;
-      BEGIN {
-         SymObj::sym_create(SymObj::NONE, { # (NONE is 0..)
-               _name => '', _array => [qw(Is Easy)],
-               _hash => {To => 'hv1', Use => 'hv2'} });
-      }
+      SymObj::sym_create(SymObj::NONE, { # (NONE is 0..)
+         _name => '', _array => [qw(Is Easy)],
+         _hash => {To => 'hv1', Use => 'hv2'} });
    }
    my $o = X1->new(name => 'SymObj');
    print $o->name, ' ';
@@ -617,19 +618,23 @@ S-SymObj -- an easy way to create symbol-tables and objects.
 
    # Unknown arguments are detected when DEBUG/VERBOSE is enabled.
    {package X2;
-      our (@ISA); BEGIN { @ISA = ('X1');
-         SymObj::sym_create(0, {}); # <- adds no fields on its own
-      }
+      our @ISA = ('X1');
+      SymObj::sym_create(0, {}); # <- adds no fields on its own
    }
-   my $o = X2->new(name => 'It detects some misuses', 'un' => 'known');
+   # (Clean hierarchy has optimized constructor which is used, then)
+   if ($SymObj::Debug != 0) {
+      $o = X2->new(name => 'It detects some misuses (if $Debug > 0)',
+         'un' => 'known argument catched');
+   } else {
+      $o = X2->new(name => 'It detects some misuses (if $Debug > 0)');
+   }
    print $o->name, "\n";
 
    # Fields which mirror fieldnames of superclasses define overrides.
    {package X3;
-      our (@ISA); BEGIN { @ISA = ('X2');
-         SymObj::sym_create(0, { '_name' => 'Auto superclass-ovw'},
-            sub { my $self = shift; print "X3 usr ctor\n"; });
-      }
+      our @ISA = ('X2');
+      SymObj::sym_create(0, { '_name' => 'Auto superclass-ovw'},
+         sub { my $self = shift; print "X3 usr ctor\n"; });
    }
    $o = X3->new();
    print $o->name, "\n";
@@ -638,9 +643,8 @@ S-SymObj -- an easy way to create symbol-tables and objects.
    # values by using the @/% type modifiers; the objects themselves
    # are lazy-created as necessary, then...
    {package X4;
-      our (@ISA); BEGIN { @ISA = ('X3');
-         SymObj::sym_create(0, { '%_hash2'=>undef, '@_array2'=>undef });
-      }
+      our @ISA = ('X3');
+      SymObj::sym_create(0, { '%_hash2'=>undef, '@_array2'=>undef });
       sub __ctor { my $self = shift; print "X4 usr ctor\n"; }
    }
    $o = X4->new(name => 'A X4');

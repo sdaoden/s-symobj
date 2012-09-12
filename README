@@ -58,19 +58,20 @@ module itself -- if that has been regularly installed via CPAN as shown
 above, then the manual should show up by typing ``$ man SymObj``,
 otherwise the ``pod2XY`` family of programs can be used directly upon
 SymObj.pm, as in ``$ pod2text SymObj.pm``.  The POD example as of
-2012-08-29: ::
+2012-09-12: ::
 
-   # You need to require it in a BEGIN{}..
-   BEGIN { require SymObj; $SymObj::Debug = 0; } # Try out $Debug=1 and =2..
+   use diagnostics -verbose;
+   use strict;
+   use warnings;
+   # You need to require it in a BEGIN{}..; try out $Debug= 1/2
+   BEGIN { require SymObj; $SymObj::Debug = 0; }
 
-   # Accessor subs return references for hashes and arrays (except in wantarray
-   # context -- they return copies, then), scalars are returned "as-is"
+   # Accessor subs return references for hashes and arrays (but shallow
+   # copy in wantarray context) scalars are returned "as-is"
    {package X1;
-      BEGIN {
-         SymObj::sym_create(SymObj::NONE, { # (NONE is 0..)
-               _name => '', _array => [qw(Is Easy)],
-               _hash => {To => 'hv1', Use => 'hv2'} });
-      }
+      SymObj::sym_create(SymObj::NONE, { # (NONE is 0..)
+         _name => '', _array => [qw(Is Easy)],
+         _hash => {To => 'hv1', Use => 'hv2'} });
    }
    my $o = X1->new(name => 'SymObj');
    print $o->name, ' ';
@@ -79,34 +80,38 @@ SymObj.pm, as in ``$ pod2text SymObj.pm``.  The POD example as of
 
    # Unknown arguments are detected when DEBUG/VERBOSE is enabled.
    {package X2;
-      our (@ISA); BEGIN { @ISA = ('X1');
-         SymObj::sym_create(0, {}); # <- adds no fields on its own
-      }
+      our @ISA = ('X1');
+      SymObj::sym_create(0, {}); # <- adds no fields on its own
    }
-   my $o = X2->new(name => 'SymObj detects some misuses', 'unknown' => 'arg');
+   # (Clean hierarchy has optimized constructor which is used, then)
+   if ($SymObj::Debug != 0) {
+      $o = X2->new(name => 'It detects some misuses (if $Debug > 0)',
+         'un' => 'known argument catched');
+   } else {
+      $o = X2->new(name => 'It detects some misuses (if $Debug > 0)');
+   }
    print $o->name, "\n";
 
    # Fields which mirror fieldnames of superclasses define overrides.
    {package X3;
-      our (@ISA); BEGIN { @ISA = ('X2');
-         SymObj::sym_create(0, { '_name' => 'Auto superclass-overwrite'},
-            sub { my $self = shift; print "X3 user ctor (no retval)\n"; });
-      }
+      our @ISA = ('X2');
+      SymObj::sym_create(0, { '_name' => 'Auto superclass-ovw'},
+         sub { my $self = shift; print "X3 usr ctor\n"; });
    }
    $o = X3->new();
    print $o->name, "\n";
 
-   # It is possible to force creation of array/hash accessors even for undef
-   # values by using the @/% type modifiers; the objects themselves are
-   # lazy-created as necessary, then...
+   # One may enforce creation of array/hash accessors even for undef
+   # values by using the @/% type modifiers; the objects themselves
+   # are lazy-created as necessary, then...
    {package X4;
-      our (@ISA); BEGIN { @ISA = ('X3');
-         SymObj::sym_create(0, { '%_hash2' => undef, '@_array2' => undef});
-      }
-      sub __ctor { my $self = shift; print "X4 user ctor (no retval)\n"; }
+      our @ISA = ('X3');
+      SymObj::sym_create(0, { '%_hash2'=>undef, '@_array2'=>undef });
+      sub __ctor { my $self = shift; print "X4 usr ctor\n"; }
    }
    $o = X4->new(name => 'A X4');
-   die 'Lazy-allocation failed' if ! defined $o->hash2 || ! defined $o->array2;
+   die 'Lazy-allocation failed'
+      if ! defined $o->hash2 || ! defined $o->array2;
    print join(' ', keys %{$o->hash2(Allocation=>1, Lazy=>1)}), ' ';
    print join(' ', @{$o->array2(qw(Can Be Used))}), "\n";
 
@@ -119,4 +124,4 @@ SymObj.pm, as in ``$ pod2text SymObj.pm``.  The POD example as of
    print join(' ', keys %{$o->hash2}), "\n";
    # P.S.: this is also true for the constructor(s)
 
-.. vim:set fenc=utf-8 filetype=rst syntax=rst ts=8 sts=3 sw=3 et tw=75:
+.. vim:set fenc=utf-8 syntax=rst ts=8 sts=3 sw=3 et tw=75:
