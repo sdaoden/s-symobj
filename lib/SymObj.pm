@@ -209,7 +209,22 @@ sub sym_create { # {{{
    if ($flags & DEBUG) {
       $ctor = sub { SymObj::_ctor_dbg($pkg, shift, \@_); };
    } elsif ($flags & _CLEANHIER) {
-      $ctor = sub { SymObj::_ctor_cleanhier($pkg, shift, \@_); };
+      $ctor = sub {
+         my ($class, $self) = (shift, {});
+         $self = bless $self, $class;
+         # Embed arguments
+         $self = SymObj::_ctor_argembed($pkg, $class, $self, \%actorargs,
+               \%actorargs, \@_);
+         # Fill what is not yet filled from arguments..
+         $self = SymObj::_ctor_fillup(undef, $self, \%actorargs, '_');
+         # Call user CTORs in correct order..
+         foreach $pkg (@isa) {
+            if (defined(my $sym = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
+               &$sym($self);
+            }
+         }
+         $self
+      };
    } else {
       $ctor = sub { SymObj::_ctor_dirtyhier($pkg, shift, \@_); };
    }
@@ -450,29 +465,6 @@ j_OVW:}
 
    if (defined($i = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
       &$i($self);
-   }
-   $self
-} # }}}
-
-sub _ctor_cleanhier { # {{{
-   my ($pkg, $class, $argaref) = @_;
-   my $self = {};
-   $self = bless $self, $class;
-   my $isa = ${"${pkg}::"}{_SymObj_ISA};
-   my $allargs = ${"${pkg}::"}{_SymObj_ALL_CTOR_ARGS};
-
-   # Embed arguments
-   $self = SymObj::_ctor_argembed($pkg, $class, $self, $allargs, $allargs,
-         $argaref);
-
-   # Fill what is not yet filled from arguments..
-   $self = SymObj::_ctor_fillup($undef, $self, $allargs, '_');
-
-   # Call user CTORs in correct order..
-   foreach $pkg (@$isa) {
-      if (defined(my $sym = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
-         &$sym($self);
-      }
    }
    $self
 } # }}}
