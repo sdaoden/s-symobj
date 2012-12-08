@@ -329,7 +329,6 @@ j_OVW:}
       print $MsgFH "${pkg}: $class->new(): odd argument discarded!\n";
    }
 
-   # Use generic internal accessors here
    while (@$argaref) {
       $k = shift @$argaref;
       $i = '_' . $k;
@@ -342,14 +341,14 @@ j_OVW:}
       next unless exists $tfields->{$i};
 
       if (ref $tfields->{$i} eq 'ARRAY') {
-         $self->_SymObj_ArraySet('new()', $i, $j);
+         Symobj::_array_set($pkg, $self, $k, $i, $j);
       } elsif (ref $tfields->{$i} eq 'HASH') {
          unless (ref $j eq 'ARRAY' || ref $j eq 'HASH') {
             print $MsgFH "${pkg}: $class->new(): ",
                "'$k' requires ARRAY or HASH argument\n";
             next;
          }
-         $self->_SymObj_HashSet('new()', $i, $j);
+         Symobj::_hash_set($pkg, $self, $k, $i, $j);
       } else {
          $self->{$i} = $j;
       }
@@ -423,12 +422,12 @@ j_OVW:}
       next unless exists $tfields->{$i};
 
       if (ref $tfields->{$i} eq 'ARRAY') {
-         $self->_SymObj_ArraySet('new()', $i, $j);
+         Symobj::_array_set($pkg, $self, $k, $i, $j);
       } elsif (ref $tfields->{$i} eq 'HASH') {
          unless (ref $j eq 'ARRAY' || ref $j eq 'HASH') {
             next;
          }
-         $self->_SymObj_HashSet('new()', $i, $j);
+         Symobj::_hash_set($pkg, $self, $k, $i, $j);
       } else {
          $self->{$i} = $j;
       }
@@ -469,9 +468,9 @@ sub _ctor_cleanhier { # {{{
       my $v = shift @$argaref;
       my $tv = ${$allargs->{$k}};
       if (ref $tv eq 'ARRAY') {
-         $self->_SymObj_ArraySet('new()', $pk, $v);
+         Symobj::_array_set($pkg, $self, $k, $pk, $v);
       } elsif (ref $tv eq 'HASH') {
-         $self->_SymObj_HashSet('new()', $pk, $v);
+         Symobj::_hash_set($pkg, $self, $k, $pk, $v);
       } else {
          $self->{$pk} = $v;
       }
