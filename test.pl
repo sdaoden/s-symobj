@@ -1,7 +1,7 @@
 #@ Automated test for S-SymObj (make test).
 #@ Note this should be run with $Debug=0,1,2 TODO automatize this
 
-use Test::Simple tests => 51;
+use Test::Simple tests => 53;
 
 BEGIN { require SymObj; $SymObj::Debug = 0; }
 my ($o, $v, @va, %ha, $m);
@@ -282,5 +282,53 @@ ok($o->n eq 'DC' && $o->v == 13 && $o->i1 eq 'C111' && $o->i2 eq 'C112' &&
    $o->i6 eq 'D111' && $o->i7 eq 'D1121' && $o->i8 eq 'D112' &&
    $o->i9 eq 'D11' && $o->i10 eq 'D121' && $o->i11 eq 'D12' &&
    $o->i12 eq 'D1' && $o->i13 eq 'DC');
+
+## Deep cloning
+
+{package E1;
+   SymObj::sym_create(SymObj::NONE, {
+      _array => [1, [2, 3]], _hash => {one => 4, two => [5, 6]} });
+
+   sub reset {
+      array()->[0] = 1;
+      array()->[1]->[0] = 2;
+      hash()->{one} = 4;
+      hash()->{two}->[0] = 5;
+   }
+
+   sub modify {
+      array()->[0] = -1;
+      array()->[1]->[0] = -2;
+      hash()->{one} = -4;
+      hash()->{two}->[0] = -5;
+   }
+
+   sub test {
+      my ($self, $ismod) = @_;
+      # First level is always "deep copied", but references deeper only with
+      # DEEP_CLONE
+      if (! $ismod) {
+         $self->array->[0] == 1 && $self->array->[1]->[0] == 2 &&
+            $self->hash->{one} == 4 && $self->hash->{two}->[0] == 5;
+      } else {
+         $self->array->[0] == 1 && $self->array->[1]->[0] == -2 &&
+            $self->hash->{one} == 4 && $self->hash->{two}->[0] == -5;
+      }
+   }
+}
+{package E11;
+   our @ISA = ('E1'); SymObj::sym_create(SymObj::DEEP_CLONE, {});
+}
+{package E12;
+   our @ISA = ('E1'); SymObj::sym_create(SymObj::NONE, {});
+}
+
+$o = E11->new;
+E1::modify();
+ok($o->test(0));
+E1::reset();
+$o = E12->new;
+E1::modify();
+ok($o->test(1));
 
 # vim:set fenc=utf-8 syntax=perl ts=8 sts=3 sw=3 et tw=79:
