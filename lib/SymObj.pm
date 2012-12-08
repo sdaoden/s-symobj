@@ -26,6 +26,7 @@ no strict 'refs'; # We fool around with that by definition, so this
 sub NONE()        { 0 }
 sub DEBUG()       { 1<<0 }
 sub VERBOSE()     { 1<<1 }
+sub DEEP_CLONE()  { 1<<2 }
 sub _USRMASK()    { 0x7 }
 
 sub _CLEANHIER()  { 1<<5 }
@@ -574,7 +575,7 @@ S-SymObj -- an easy way to create symbol-tables and objects.
    BEGIN { require SymObj; $SymObj::Debug = 0; }
 
    # Accessor subs return references for hashes and arrays (but shallow
-   # copy in wantarray context) scalars are returned "as-is"
+   # clones in wantarray context), scalars are returned "as-is"
    {package X1;
       SymObj::sym_create(SymObj::NONE, { # (NONE is 0..)
          _name => '', _array => [qw(Is Easy)],
@@ -635,19 +636,18 @@ S-SymObj -- an easy way to create symbol-tables and objects.
 
 SymObj.pm provides an easy way to create and construct symbol-tables
 and objects.  With a simple hash one defines the fields an object
-should have.  An automatically instantiated constructor can then be
-used to create the object, and the generated accessor subs implement
-a I<feed in and forget> approach when they are about to manage arrays
-or hashes, trying to handle all kinds of arguments; this is also true
-for the constructor.
+should have, and the desired accessors and a constructor subroutine
+will be automatically generated.  Subroutines which deal with arrays
+and hashes implement a I<feed in and forget> approach, in that hash
+and array arguments are unfolded; the constructor will behave this way
+for all managed array and hash fields.
 
-If debug was enabled upon creation time a constructor which does a lot
-of argument checking and more is used, which is pretty useful in times
-when the interface is unstable.  Otherwise a different constructor is
-used which implements no checking at all; and if the object in question
-is the head of a "clean" object tree, one that is entirely managed by
-S-SymObj, then indeed a super-fast super-lean constructor implementation
-is used that'll rock your house.
+If debug was enabled upon symbol-table creation time a verbose and
+error checking constructor is used.  Otherwise a straight constructor
+without any checking will be created; and if the managed object is the
+head of a "clean" object tree, i.e., one that is entirely managed by
+S-SymObj, then a super-fast super-lean constructor implementation is
+used that'll rock your house.
 
 SymObj.pm works for Multiple-Inheritance as good as perl(1) allows.
 (That is to say that only one straight object tree can be used, further
@@ -666,7 +666,7 @@ S-SymObj managed and non-managed classes in B<mixed order>, as in
 I<MANAGED subclassof NON-MANAGED subclassof MANAGED>, because tree
 traversal actually stops once a I<NON-MANAGED> class is seen.  This
 is logical, because non-managed classes do not contain the necessary
-information for S-SymObj.
+information for S-SymObj to function.
 
 The SymObj module is available on CPAN.  The S-SymObj project is located
 at L<http://sdaoden.users.sourceforge.net/code.html>.  It is developed
@@ -694,14 +694,14 @@ written to.
 
 =item C<$Debug> (0=off, 1=on, 2=verbose; default: 1)
 
-If set to a value different to 0 then a lot of debug checks are
+If set to a value different than 0 then a lot of debug checks are
 performed, and a rather slow object-constructor path is chosen (see
 below).  If set to a value greater than 1 then message verbosity is
 increased.  All messages go to L<"MsgFH">.
 
 B<Note:> changing this value later on will neither affect the
-object-constructor paths nor the per-object settings of all classes
-and class-objects that have already been created/instantiated.
+object-constructor paths nor the per-object settings of classes and
+class-objects that already have been instantiated.
 
 =item C<NONE>
 
@@ -718,6 +718,38 @@ be recognized otherwise.
 Bit-flag for L<"sym_create">, meaning to enable verbosity on a per-object
 level.  Cannot be used to overwrite an enabled L<"Debug">, but will
 be recognized otherwise.
+
+=item C<DEEP_CLONE>
+
+Bit-flag for L<"sym_create">.  If this is set then values from the
+per-class reference hash are deep cloned upon object construction time.
+Normally these fields are reference-copied except for the first,
+immediate level, which is shallow cloned; i.e., if the value is an
+array or hash, that very array or hash is cloned, but the values within
+it are only reference copied.  But if this flag is set then array and
+hash members are I<recursively> cloned in addition.  E.g.:
+
+   SymObj::sym_create(SymObj::NONE, { array => [1, [2, 3]] });
+   ->
+   $o = XXX->new;
+   die unless $o->array->[1]->[0] == 2;
+   XXX::array()->[0] = -1;
+   die unless $o->array->[0] == 1;
+   XXX::array()->[1]->[0] = -2;
+   die unless $o->array->[1]->[0] == -2;
+
+   SymObj::sym_create(SymObj::DEEP_CLONE, { array => [1, [2, 3]] });
+   ->
+   $o = XXX->new;
+   die unless $o->array->[1]->[0] == 2;
+   XXX::array()->[0] = -1;
+   die unless $o->array->[0] == 1;
+   XXX::array()->[1]->[0] = -2;
+   die unless $o->array->[1]->[0] == 2;
+
+This flag will be overwritten by subclasses, i.e., the C<DEEP_CLONE>
+state of the I<actually instantiated> subclass is what is used to
+decide wether deep cloning shall be performed or not.
 
 =item C<pack_exists(C<$1>=string=package/class)>
 
@@ -743,9 +775,9 @@ L<"$_SymObj_FIELDS"> and used for the time being!  It should thus be
 assumed that ownership of C<$2> is overtaken by S-SymObj.
 
 C<$1> can be used to set per-class (package that is) flags, like
-L<"DEBUG"> or L<"VERBOSE">.  Flags set like that will be inherited by
-all subclasses (unless otherwise noted).  It is not possible to lower
-the global L<"Debug"> state on this basis.
+L<"DEBUG"> or L<"DEEP_CLONE">.  Flags set like that will be inherited
+by all subclasses (unless otherwise noted).  It is not possible to
+lower the global L<"Debug"> state on this basis, though.
 
 C<$3> is the optional per-object user constructor, which can be used
 to perform additional setup of C<$self> as necessary.  These user
@@ -766,7 +798,8 @@ If in doubt, pass a code-reference.
 SymObj generally "enforces" privacy (by definition) via an underscore
 prefix: all keys of C<$2> are expected to start with an underscore,
 but the public accessor methods will miss that (C<_data> becomes
-C<data>).
+C<data>).  This is actually a requirement that is checked if debug is
+enabled, since SymObj won't function properly for this field otherwise.
 
 The created accessor subs work as methods if the first argument that
 is seen is a reference that seems to be a class instantiation (i.e.,
@@ -775,17 +808,17 @@ C<$self>, as in C<$self-E<gt>name()>) and as functions otherwise
 hash (C<$2>) is used!  (Note that no locking is performed in the latter
 case, i.e., this should not be done in multithreaded programs.)  If
 they act upon arrays or hashes they'll return references to the members
-by default, but do return copies in C<wantarray> context instead.
+by default, but do return shallow clones in C<wantarray> context instead.
 
 If a key in C<$2> is prefixed with an AT or a PERCENT, as in C<'@_name'>
 or C<'%_name'>, respectively, then the field in question is assumed
 to be an array or hash, respectively.  By default S-SymObj uses the
 value to figure out which kind of accessor has to be used, but for
-that the value must be set to a value different than C<undef>, which
-is sometimes not desirable, e.g., when a field should be lazy allocated,
+that the value must be set to a value different to C<undef>, which is
+sometimes not desirable, e.g., when a field should be lazy allocated,
 only if it is really used.  Note that the generic accessors will
 automatically instantiate an empty array/hash as necessary in these
-cases.
+cases once the field is accessed first.
 
 After the (optional) C<@> or C<%> type modifier, one may use (also
 optionally) C<?> or C<!>, mutually exclusive, as an access modifier.
@@ -798,36 +831,38 @@ this case.
 Whatever type and/or access modifier(s) was/were present, they will
 be stripped from the field name, just like a following underscore will,
 i.e., a field C<'@!_name'> will actually end up as C<_name> in the
-class-static hash, with an accessor sub named C<name>.
+class-static hash, with the accessor subroutinge C<name>.
 
 In addition to those accessor subs there will I<always> be private
 accessor subs be created which use the public name prefixed with two
 underscores, as in C<$self-E<gt>__name()>.  These subs do nothing
 except returning a reference to the field in question.  They're ment
-to be used instead of direct access of members in some contexts, i.e.,
+to be used instead of direct access to members in some contexts, i.e.,
 for encapsulation purposes.  Note that they do I<not> automatically
 instantiate lazy allocated fields.
 
 Note that, if any of the superclasses of C<$1>, as detected through
 its C<@ISA> array, provides fields which have identical names to what
-is provided in C<$2>, this situation is treated as an overwrite request,
-and it is verified that the value type matches.  Unfortunately the
-subclass will create accessor subs on its own, because users need to
-be able to adjust the class-static data.  And, also unfortunately,
-different access policies won't be detected.
+is provided in C<$2>, one specifies an overwrite request, and it is
+verified that the value type matches.  Unfortunately the subclass will
+create accessor subs on its own, because users need to be able to
+adjust the class-static data.  And, also unfortunately, different
+access policies won't be detected.
 
 =item C<clone_ref($1=ref, $2=boolean=deep-clone-reference)>
 
 Calling this support sub clones the variable C<$1>, which is treated
 as a plain scalar unless it is a HASH or ARRAY reference.  If C<$2>
-is not false then C<clone_ref()> recure for it.  The final perl variable
-is returned.  (This is the logic behind C<DEEP_CLONE>.)
+is not false then C<clone_ref()> recurses for the variable, cloning
+all levels until no more HASH or ARRAY references remain (uncloned).
+The final perl variable is returned.  (This is the logic behind
+C<DEEP_CLONE>.)
 
 =back
 
 =head1 INJECTED SYMBOLS
 
-For completeness, here is a list of all the symbols that S-SymObj
+For completeness sake, here is a list of all the symbols that S-SymObj
 creates internally for each managed package.
 
 =over
@@ -869,6 +904,18 @@ resolved).
 =item C<new()>
 
 The auto-generated public class constructor.
+
+=back
+
+=head1 NEWS
+
+=over
+
+=item v0.8.0
+
+Support for L<"DEEP_CLONE"> was added.
+The code has been reordered.
+Much lesser generated code is injected into classes.
 
 =back
 
