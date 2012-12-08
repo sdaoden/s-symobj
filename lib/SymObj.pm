@@ -30,13 +30,13 @@ sub _USRMASK()    { 0x7 }
 
 sub _CLEANHIER()  { 1<<5 }
 
-sub _UUID         { 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD'; }
+sub _UUID         { 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD' }
 
 our $MsgFH = *STDERR;
 our $Debug = 1; # 0,1,2
 
 sub pack_exists {
-   %{"${_[0]}::"};
+   %{"${_[0]}::"}
 }
 
 sub sym_dump {
@@ -45,13 +45,13 @@ sub sym_dump {
    if (my $i = ref $pkg) { $pkg = $i; }
    foreach (keys %{*{"${pkg}::"}}) { print $MsgFH "$_ "; }
    #while (my ($k, $v) = each %{*{"${pkg}::"}}) { print $MsgFH "$k($v) "; }
-   print $MsgFH "\n";
+   print $MsgFH "\n"
 }
 
 sub obj_dump {
    use Data::Dumper;
    my $self = shift;
-   print $MsgFH "SymObj::obj_dump(): ", Dumper($self), "\n";
+   print $MsgFH "SymObj::obj_dump(): ", Dumper($self), "\n"
 }
 
 sub sym_create { # {{{
@@ -248,17 +248,20 @@ sub _resolve_tree { # {{{
          if defined ${"${c}::"}{ISA};
       push @$_isa, $c;
    }
+   1
 } # }}}
 
 sub _complain_exclude {
    my ($pkg, $pub) = @_;
    print $MsgFH "${pkg}::$pub(): field can't be accessed through object, ",
       "accessing class-static!\n";
+   1
 }
 
 sub _complain_rdonly {
    my ($pkg, $pub) = @_;
    print $MsgFH "${pkg}::$pub(): write access to READONLY field!\n";
+   1
 }
 
 sub _hash_set { # {{{
@@ -329,6 +332,7 @@ sub _find_usr_ctor { # {{{
       ${"${pkg}::"}{_SymObj_USR_CTOR} = $ctor;
       &$ctor($self);
    }
+   1
 } # }}}
 
 sub _ctor_dbg { # {{{
@@ -439,7 +443,7 @@ j_OVW:}
    if (defined($i = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
       &$i($self);
    }
-   $self;
+   $self
 } # }}}
 
 sub _ctor_dirtyhier { # (Stripped version of _dbg) {{{
@@ -511,7 +515,7 @@ j_OVW:}
    if (defined($i = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
       &$i($self);
    }
-   $self;
+   $self
 } # }}}
 
 sub _ctor_cleanhier { # {{{
@@ -560,7 +564,7 @@ sub _ctor_cleanhier { # {{{
          &$sym($self);
       }
    }
-   $self;
+   $self
 } # }}}
 1;
 __END__
