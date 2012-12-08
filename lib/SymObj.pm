@@ -217,7 +217,12 @@ sub sym_create { # {{{
          $self = SymObj::_ctor_argembed($pkg, $class, $self, \%actorargs,
                \%actorargs, \@_);
          # Fill what is not yet filled from arguments..
-         $self = SymObj::_ctor_fillup(undef, $self, \%actorargs, '_');
+         my $f = $flags & DEEP_CLONE;
+         while (($i, $j) = each %actorargs) {
+            $i = '_' . $i;
+            next if exists $self->{$i};
+            $self->{$i} = SymObj::clone_ref($$j, $f);
+         }
          # Call user CTORs in correct order..
          foreach $pkg (@isa) {
             if (defined(my $sym = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
@@ -443,9 +448,20 @@ j_OVW:}
    delete $self->{_UID} if $init_chain;
 
    # Finally: fill in yet unset members of $self via the per-class template.
-   # By default anon-hashes and -arrays get reference-copied;
-   # we however *do* need a detached (deep) copy!
-   $self = SymObj::_ctor_fillup("${pkg}: $class->new()", $self, $tfields,undef);
+   $j = $flags;
+   if (defined ${"${class}::"}{_SymObj_FLAGS}) { # FIXME
+      $j = ${"${class}::"}{_SymObj_FLAGS};
+   }
+   $j &= DEEP_CLONE;
+   while (($k, $i) = each %$tfields) {
+      next if exists $self->{$k};
+      if (ref $i && ref $i ne 'HASH' && ref $i ne 'ARRAY') {
+         print $MsgFH "${pkg}: $class->new(): value of '$k' has an ",
+            "unsupported type!\n";
+         next;
+      }
+      $self->{$k} = SymObj::clone_ref($i, $j);
+   }
 
    # Call further init code, if defined
    if (defined($i = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
@@ -489,7 +505,16 @@ j_OVW:}
          $argaref);
 
    # Fill what is not yet filled from arguments..
-   $self = SymObj::_ctor_fillup(undef, $self, $tfields, undef);
+   if (defined ${"${class}::"}{_SymObj_FLAGS}) { # FIXME
+      $j = ${"${class}::"}{_SymObj_FLAGS};
+   } else {
+      $j = ${"${pkg}::"}{_SymObj_FLAGS};
+   }
+   $j &= DEEP_CLONE;
+   while (($k, $i) = each %$tfields) {
+      next if exists $self->{$k};
+      $self->{$k} = SymObj::clone_ref($i, $j);
+   }
 
    if (defined($i = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
       &$i($self);
@@ -525,35 +550,6 @@ sub _ctor_argembed { # {{{
          Symobj::_hash_set($pkg, $self, $k, $pk, $v);
       } else {
          $self->{$pk} = $v;
-      }
-   }
-   $self
-} # }}}
-
-sub _ctor_fillup { # {{{
-   my ($dbg, $self, $argsr, $prefix) = @_;
-
-   while (my ($k, $v) = each %$argsr) {
-      if (defined $prefix) {
-         $k = $prefix . $k;
-         $v = $$v;
-      }
-      next if exists $self->{$k};
-      if (defined $dbg && ref $v && ref $v ne 'HASH' && ref $v ne 'ARRAY') {
-         print $MsgFH "$dbg: value of '$k' has an unsupported type!\n";
-         next;
-      }
-
-      unless (ref $v) {
-         $self->{$k} = $v;
-      } elsif (ref $v eq 'ARRAY') {
-         my @a;
-         push @a, $_ foreach (@$v);
-         $self->{$k} = \@a;
-      } else {
-         my (%h, $hk, $hv);
-         while (($hk, $hv) = each %$v) { $h{$hk} = $hv; }
-         $self->{$k} = \%h;
       }
    }
    $self
