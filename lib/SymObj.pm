@@ -870,14 +870,6 @@ resolved).
 
 The auto-generated public class constructor.
 
-=item C<_SymObj_ArraySet()>
-
-Shared array handler, only if needed.
-
-=item C<_SymObj_HashSet()>
-
-Shared hash handler, only if needed.
-
 =back
 
 =head1 FUTURE DIRECTIONS
