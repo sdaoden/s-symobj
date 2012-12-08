@@ -1,7 +1,7 @@
 #@ (S-)Sym(bolic)Obj(ect) - easy creation of symbol tables and objects.
 package SymObj;
 require 5.008_001;
-our $VERSION = '0.6.1';
+our $VERSION = '0.8.0';
 our $COPYRIGHT =<<__EOT__;
 Copyright (c) 2010 - 2012 Steffen "Daode" Nurpmeso <sdaoden\@users.sf.net>.
 All rights reserved under the terms of the ISC license.
@@ -567,15 +567,16 @@ S-SymObj -- an easy way to create symbol-tables and objects.
    use diagnostics -verbose;
    use strict;
    use warnings;
-   # You need to require it in a BEGIN{}..; try out $Debug= 1/2
-   BEGIN { require SymObj; $SymObj::Debug = 0; }
+   # You need to require it in a BEGIN{}..; $Debug may be one of 0/1/2
+   BEGIN { require SymObj; $SymObj::Debug = 2; }
 
    # Accessor subs return references for hashes and arrays (but shallow
    # clones in wantarray context), scalars are returned "as-is"
    {package X1;
       SymObj::sym_create(SymObj::NONE, { # (NONE is 0..)
          _name => '', _array => [qw(Is Easy)],
-         _hash => {To => 'hv1', Use => 'hv2'} });
+         _hash => {To => 'hv1', Use => 'hv2'},
+         boing => undef }); # <- $SymObj::Debug will complain!  FAILS!
    }
    my $o = X1->new(name => 'SymObj');
    print $o->name, ' ';
@@ -674,7 +675,7 @@ L<http://sourceforge.net/p/ssymobj/code/>).
 
 =over
 
-=item C<$VERSION> (string, i.e., '0.6.1')
+=item C<$VERSION> (string, i.e., '0.8.0')
 
 A version string.
 
