@@ -30,7 +30,7 @@ sub _USRMASK()    { 0x7 }
 
 sub _CLEANHIER()  { 1<<5 }
 
-sub _UUID         { 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD' }
+sub _UUID         { 'S_SymObj__1C8288D6_9EDA_4ECD_927F_2144B94186AD' }
 
 our $MsgFH = *STDERR;
 our $Debug = 1; # 0,1,2
@@ -393,30 +393,11 @@ j_OVW:}
       print $MsgFH "${pkg}: $class->new(): odd argument discarded!\n";
    }
 
-   while (@$argaref) {
-      $k = shift @$argaref;
-      $i = '_' . $k;
-      $j = shift @$argaref;
-      unless (exists $actorargs->{$k}) {
-         next if $init_chain;
-         print $MsgFH "${pkg}: $class->new(): unknown argument: '$k'\n";
-         next;
-      }
-      next unless exists $tfields->{$i};
-
-      if (ref $tfields->{$i} eq 'ARRAY') {
-         Symobj::_array_set($pkg, $self, $k, $i, $j);
-      } elsif (ref $tfields->{$i} eq 'HASH') {
-         unless (ref $j eq 'ARRAY' || ref $j eq 'HASH') {
-            print $MsgFH "${pkg}: $class->new(): ",
-               "'$k' requires ARRAY or HASH argument\n";
-            next;
-         }
-         Symobj::_hash_set($pkg, $self, $k, $i, $j);
-      } else {
-         $self->{$i} = $j;
-      }
-   }
+   # Embed arguments
+   $self->{_UID} = undef if $init_chain;
+   $self = SymObj::_ctor_argembed($pkg, $class, $self, $actorargs, $tfields,
+         $argaref);
+   delete $self->{_UID} if $init_chain;
 
    # Finally: fill in yet unset members of $self via the per-class template.
    # By default anon-hashes and -arrays get reference-copied;
@@ -460,26 +441,9 @@ j_OVW:}
    $self = {} unless defined $self;
    $self = bless $self, $class;
 
-   while (@$argaref) {
-      $k = shift @$argaref;
-      $i = '_' . $k;
-      $j = shift @$argaref;
-      unless (exists $actorargs->{$k}) { # XXX tfields test next sufficient?!
-         next;
-      }
-      next unless exists $tfields->{$i};
-
-      if (ref $tfields->{$i} eq 'ARRAY') {
-         Symobj::_array_set($pkg, $self, $k, $i, $j);
-      } elsif (ref $tfields->{$i} eq 'HASH') {
-         unless (ref $j eq 'ARRAY' || ref $j eq 'HASH') {
-            next;
-         }
-         Symobj::_hash_set($pkg, $self, $k, $i, $j);
-      } else {
-         $self->{$i} = $j;
-      }
-   }
+   # Embed arguments
+   $self = SymObj::_ctor_argembed($pkg, $class, $self, $actorargs, $tfields,
+         $argaref);
 
    # Fill what is not yet filled from arguments..
    $self = SymObj::_ctor_fillup(undef, $self, $tfields, undef);
@@ -498,19 +462,8 @@ sub _ctor_cleanhier { # {{{
    my $allargs = ${"${pkg}::"}{_SymObj_ALL_CTOR_ARGS};
 
    # Embed arguments
-   while (@$argaref) {
-      my $k = shift @$argaref;
-      my $pk = '_' . $k;
-      my $v = shift @$argaref;
-      my $tv = ${$allargs->{$k}};
-      if (ref $tv eq 'ARRAY') {
-         Symobj::_array_set($pkg, $self, $k, $pk, $v);
-      } elsif (ref $tv eq 'HASH') {
-         Symobj::_hash_set($pkg, $self, $k, $pk, $v);
-      } else {
-         $self->{$pk} = $v;
-      }
-   }
+   $self = SymObj::_ctor_argembed($pkg, $class, $self, $allargs, $allargs,
+         $argaref);
 
    # Fill what is not yet filled from arguments..
    $self = SymObj::_ctor_fillup($undef, $self, $allargs, '_');
@@ -519,6 +472,39 @@ sub _ctor_cleanhier { # {{{
    foreach $pkg (@$isa) {
       if (defined(my $sym = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
          &$sym($self);
+      }
+   }
+   $self
+} # }}}
+
+sub _ctor_argembed { # {{{
+   my ($pkg, $class, $self, $argsr, $myargsr, $usrr) = @_;
+   my ($isident, $k, $pk, $v, $r) = ($argsr == $myargsr);
+
+   while (@$usrr) {
+      $k = shift @$usrr;
+      $v = shift @$usrr;
+      unless (exists $argsr->{$k}) {
+         next if exists $self->{_UID};
+         print $MsgFH "${pkg}: $class->new(): unknown argument: '$k'\n";
+         next;
+      }
+      $r = ${$argsr->{$k}};
+      $pk = '_' . $k;
+      # In non-optimized case: is this an arg of $pkg?
+      next unless $isident || exists $myargsr->{$pk};
+
+      if (ref $r eq 'ARRAY') {
+         Symobj::_array_set($pkg, $self, $k, $pk, $v);
+      } elsif (ref $r eq 'HASH') {
+         unless (ref $v eq 'ARRAY' || ref $v eq 'HASH') {
+            print $MsgFH "${pkg}: $class->new(): ",
+               "'$k' requires ARRAY or HASH argument\n";
+            next;
+         }
+         Symobj::_hash_set($pkg, $self, $k, $pk, $v);
+      } else {
+         $self->{$pk} = $v;
       }
    }
    $self
@@ -873,7 +859,7 @@ initialize default objects if none has been given by user.
 
 Finally: realize that perl(1) ships with struct and class and similar
 things which head in the very same direction as S-SymObj.  I want to
-point out that i wrote this package the hard way.  It is me.
+point out that i wrote this package the hard way.  It is I.
 
 =head1 LICENSE
 
