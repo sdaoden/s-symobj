@@ -232,6 +232,33 @@ sub sym_create { # {{{
    1
 } # }}}
 
+sub clone_ref { # {{{
+   my ($r, $deep) = @_;
+
+   if (! $deep) {
+      if (ref $r eq 'ARRAY') {
+         my @a;
+         push @a, $_ foreach (@$r);
+         $r = \@a;
+      } elsif (ref $r eq 'HASH') {
+         my (%h, $hk, $hv);
+         while (($hk, $hv) = each %$r) { $h{$hk} = $hv; }
+         $r = \%h;
+      }
+   } else {
+      if (ref $r eq 'ARRAY') {
+         my @a;
+         push @a, SymObj::clone_ref($_, 1) foreach (@$r);
+         $r = \@a;
+      } elsif (ref $r eq 'HASH') {
+         my (%h, $hk, $hv);
+         while (($hk, $hv) = each %$r) { $h{$hk} = SymObj::clone_ref($hv, 1); }
+         $r = \%h;
+      }
+   }
+   $r
+} # }}}
+
 sub _resolve_tree { # {{{
    my ($pkg, $_actorargs, $_p, $_f, $_isa) = @_;
    foreach my $c (@{${"${_p}::"}{ISA}}) {
@@ -788,6 +815,13 @@ and it is verified that the value type matches.  Unfortunately the
 subclass will create accessor subs on its own, because users need to
 be able to adjust the class-static data.  And, also unfortunately,
 different access policies won't be detected.
+
+=item C<clone_ref($1=ref, $2=boolean=deep-clone-reference)>
+
+Calling this support sub clones the variable C<$1>, which is treated
+as a plain scalar unless it is a HASH or ARRAY reference.  If C<$2>
+is not false then C<clone_ref()> recure for it.  The final perl variable
+is returned.  (This is the logic behind C<DEEP_CLONE>.)
 
 =back
 
