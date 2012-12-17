@@ -122,10 +122,10 @@ sub sym_create { # {{{
       # (And hope that perl(1) optimizes away some closure conditions..)
       if (($tj & TYPE_ARRAY) || $i eq 'ARRAY') {
          print $MsgFH "\tsub $pj: array-based\n" if $flags & VERBOSE;
-         *{"${pkg}::__$pj"} = sub { $_[0]->{$xj}; };
+         *{"${pkg}::__$pj"} = sub { $_[0]->{$xj} };
          *{"${pkg}::$pj"} = sub {
             my $self = $_[0];
-            if (($self = ref $self) ne '' && %{"${self}::"}) {
+            if (($self = ref $self) && %{"${self}::"}) {
                $self = shift;
                if ($tj & TYPE_EXCLUDE) {
                   SymObj::_complain_exclude($pkg, $pj) if $flags & DEBUG;
@@ -140,14 +140,14 @@ sub sym_create { # {{{
                   if ($tj & TYPE_RDONLY) && @_ && ($flags & DEBUG);
                $f = SymObj::_array_set($pkg, $self, $pj, $xj, @_);
             }
-            wantarray ? @$f : $f;
+            wantarray ? @$f : $f
          };
       } elsif (($tj & TYPE_HASH) || $i eq 'HASH') {
          print $MsgFH "\tsub $pj: hash-based\n" if $flags & VERBOSE;
-         *{"${pkg}::__$pj"} = sub { $_[0]->{$xj}; };
+         *{"${pkg}::__$pj"} = sub { $_[0]->{$xj} };
          *{"${pkg}::$pj"} = sub {
             my $self = $_[0];
-            if (($self = ref $self) ne '' && %{"${self}::"}) {
+            if (($self = ref $self) && %{"${self}::"}) {
                $self = shift;
                if ($tj & TYPE_EXCLUDE) {
                   SymObj::_complain_exclude($pkg, $pj) if $flags & DEBUG;
@@ -162,16 +162,16 @@ sub sym_create { # {{{
                   if ($tj & TYPE_RDONLY) && @_ && ($flags & DEBUG);
                $f = SymObj::_hash_set($pkg, $self, $pj, $xj, @_);
             }
-            wantarray ? %$f : $f;
+            wantarray ? %$f : $f
          };
       } else {
          # Scalar (or "typeless")
          print $MsgFH "\tsub $pj: scalar-based ('untyped')\n"
             if $flags & VERBOSE;
-         *{"${pkg}::__$pj"} = sub { \$_[0]->{$xj}; };
+         *{"${pkg}::__$pj"} = sub { \$_[0]->{$xj} };
          *{"${pkg}::$pj"} = sub {
             my $self = $_[0];
-            if (($self = ref $self) ne '' && %{"${self}::"}) {
+            if (($self = ref $self) && %{"${self}::"}) {
                $self = shift;
                if ($tj & TYPE_EXCLUDE) {
                   SymObj::_complain_exclude($pkg, $pj) if $flags & DEBUG;
@@ -185,7 +185,7 @@ sub sym_create { # {{{
                   if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
                $self->{$xj} = shift;
             }
-            $self->{$xj};
+            $self->{$xj}
          };
       }
    }
@@ -202,13 +202,13 @@ sub sym_create { # {{{
    if (! defined $ctor || ref $ctor ne 'CODE') {
       my $_c = $ctor;
       $_c = '__ctor' unless defined $_c;
-      $ctor = sub { SymObj::_find_usr_ctor(shift, $pkg, $_c); };
+      $ctor = sub { SymObj::_find_usr_ctor(shift, $pkg, $_c) };
    }
    ${"${pkg}::"}{_SymObj_USR_CTOR} = $ctor;
 
    # new()
    if ($flags & DEBUG) {
-      $ctor = sub { SymObj::_ctor_dbg($pkg, shift, \@_); };
+      $ctor = sub { SymObj::_ctor_dbg($pkg, shift, \@_) };
    } elsif ($flags & _CLEANHIER) {
       $ctor = sub {
          my ($class, $self) = (shift, {});
@@ -232,7 +232,7 @@ sub sym_create { # {{{
          $self
       };
    } else {
-      $ctor = sub { SymObj::_ctor_dirtyhier($pkg, shift, \@_); };
+      $ctor = sub { SymObj::_ctor_dirtyhier($pkg, shift, \@_) };
    }
    *{"${pkg}::new"} = $ctor;
    1
@@ -449,7 +449,7 @@ j_OVW:}
 
    # Finally: fill in yet unset members of $self via the per-class template.
    $j = $flags;
-   if (defined ${"${class}::"}{_SymObj_FLAGS}) { # FIXME
+   if (exists ${"${class}::"}{_SymObj_FLAGS}) {
       $j = ${"${class}::"}{_SymObj_FLAGS};
    }
    $j &= DEEP_CLONE;
@@ -505,7 +505,7 @@ j_OVW:}
          $argaref);
 
    # Fill what is not yet filled from arguments..
-   if (defined ${"${class}::"}{_SymObj_FLAGS}) { # FIXME
+   if (exists ${"${class}::"}{_SymObj_FLAGS}) {
       $j = ${"${class}::"}{_SymObj_FLAGS};
    } else {
       $j = ${"${pkg}::"}{_SymObj_FLAGS};
