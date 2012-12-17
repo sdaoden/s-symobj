@@ -28,10 +28,6 @@ sub DEBUG()       { 1<<0 }
 sub VERBOSE()     { 1<<1 }
 sub _USRMASK()    { 0x7 }
 
-sub _HAS_ARRAY()  { 1<<3 }
-sub _HAS_HASH()   { 1<<4 }
-sub _HAS_ALL()    { _HAS_ARRAY | _HAS_HASH }
-
 sub _CLEANHIER()  { 1<<5 }
 
 sub _UUID         { 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD'; }
@@ -63,7 +59,7 @@ sub sym_create { # {{{
    $flags &= _USRMASK;
    $flags |= DEBUG if $flags & VERBOSE;
    $flags |= $Debug > 1 ? (DEBUG | VERBOSE) : DEBUG if $Debug;
-   my ($pkg, $i, $j, @isa, @arri, %actorargs, @ctorovers) =
+   my ($pkg, $i, $j, @isa, %actorargs, @ctorovers) =
       (scalar caller, $flags & VERBOSE);
    print $MsgFH "SymObj::sym_create(): $pkg\n" if $i;
 
@@ -78,82 +74,8 @@ sub sym_create { # {{{
    print $MsgFH ".. (inherited VERBOSE:) SymObj::sym_create(): $pkg\n"
       if ($flags & VERBOSE) && ! $i;
 
-   # Accessor and $tfields handling {{{
-   # We use shared per-object field handler subs to minimize code blow a bit.
-   # Even that is overkill unless the %FIELDS really require that though.
-   @arri = keys %$tfields;
-   foreach $i (@arri) {
-      $j = ref $tfields->{$i};
-      if ($i =~ /^@/ || $j eq 'ARRAY') {
-         $flags |= _HAS_ARRAY;
-         last if ($flags & _HAS_ALL) == _HAS_ALL;
-      } elsif ($i =~ /^%/ || $j eq 'HASH') {
-         $flags |= _HAS_HASH;
-         last if ($flags & _HAS_ALL) == _HAS_ALL;
-      }
-   }
-
-   if ($flags & _HAS_ARRAY) {
-      print $MsgFH "\t..adding shared array handler\n" if $flags & VERBOSE;
-      *{"${pkg}::_SymObj_ArraySet"} = sub {
-         my ($self, $pub, $datum) = (shift, shift, shift);
-         my $dref = $self->{$datum};
-         $dref = $self->{$datum} = [] unless defined $dref;
-
-         foreach my $arg (@_) {
-            if (ref $arg eq 'ARRAY') {
-               push(@$dref, $_) foreach (@$arg);
-            } elsif (ref $arg eq 'HASH') {
-               while (my ($k, $v) = each %$arg) {
-                  push @$dref, $k;
-                  push @$dref, $v;
-               }
-            } else {
-               push @$dref, $arg;
-            }
-         }
-         $dref;
-      };
-   }
-
-   if ($flags & _HAS_HASH) {
-      print $MsgFH "\t..adding shared hash handler\n" if $flags & VERBOSE;
-      *{"${pkg}::_SymObj_HashSet"} = sub {
-         my ($self, $pub, $datum) = (shift, shift, shift);
-         my $dref = $self->{$datum};
-         $dref = $self->{$datum} = {} unless defined $dref;
-
-         my $k = undef;
-         foreach my $arg (@_) {
-            if (defined $k) {
-               $dref->{$k} = $arg;
-               $k = undef;
-               next;
-            }
-            if (ref $arg eq 'HASH') {
-               while (my ($k, $v) = each %$arg) {
-                  $dref->{$k} = $v;
-               }
-            } elsif (ref $arg eq 'ARRAY') {
-               while (@$arg > 1) {
-                  my $v = pop @$arg;
-                  my $k = pop @$arg;
-                  $dref->{$k} = $v;
-               }
-               print $MsgFH "! ${pkg}::$pub(): wrong array member count!\n"
-                  if @$arg != 0 && ($flags & DEBUG);
-            } else {
-               $k = $arg;
-            }
-         }
-         print $MsgFH "! ${pkg}::$pub(): '$k' key without a value\n"
-            if defined $k && ($flags & DEBUG);
-         $dref;
-      };
-   }
-
    # Create accessor symtable entries
-   foreach $j (@arri) {
+   foreach $j (keys %$tfields) {
       sub TYPE_ARRAY()     { 1<<0 }
       sub TYPE_HASH()      { 1<<1 }
       sub TYPE_EXCLUDE()   { 1<<2 }
@@ -196,7 +118,7 @@ sub sym_create { # {{{
       }
       $actorargs{$pj} = \$tfields->{$xj};
 
-      # Hope that perl(1) optimizes away the TYPE_* conditions..
+      # (And hope that perl(1) optimizes away some closure conditions..)
       if (($tj & TYPE_ARRAY) || $i eq 'ARRAY') {
          print $MsgFH "\tsub $pj: array-based\n" if $flags & VERBOSE;
          *{"${pkg}::__$pj"} = sub { $_[0]->{$xj}; };
@@ -215,7 +137,7 @@ sub sym_create { # {{{
             if (! defined $f || @_) {
                SymObj::_complain_rdonly($pkg, $pj)
                   if ($tj & TYPE_RDONLY) && @_ && ($flags & DEBUG);
-               $f = "${pkg}::_SymObj_ArraySet"->($self, $pj, $xj, @_);
+               $f = SymObj::_array_set($pkg, $self, $pj, $xj, @_);
             }
             wantarray ? @$f : $f;
          };
@@ -237,7 +159,7 @@ sub sym_create { # {{{
             if (! defined $f || @_) {
                SymObj::_complain_rdonly($pkg, $pj)
                   if ($tj & TYPE_RDONLY) && @_ && ($flags & DEBUG);
-               $f = &{${"${pkg}::"}{_SymObj_HashSet}}($self, $pj, $xj, @_);
+               $f = SymObj::_hash_set($pkg, $self, $pj, $xj, @_);
             }
             wantarray ? %$f : $f;
          };
@@ -266,7 +188,6 @@ sub sym_create { # {{{
          };
       }
    }
-   # }}}
 
    # Variable fields
    ${"${pkg}::"}{_SymObj_PACKAGE} = $pkg;
@@ -293,6 +214,61 @@ sub sym_create { # {{{
       $ctor = sub { SymObj::_ctor_dirtyhier($pkg, shift, \@_); };
    }
    *{"${pkg}::new"} = $ctor;
+   1
+} # }}}
+
+sub _hash_set { # {{{
+   my ($pkg, $self, $pub, $datum) = (shift, shift, shift, shift);
+   my ($flags, $dref, $k) = (${"${pkg}::"}{_SymObj_FLAGS}, $self->{$datum});
+
+   $dref = $self->{$datum} = {} unless defined $dref;
+
+   foreach my $arg (@_) {
+      if (defined $k) {
+         $dref->{$k} = $arg;
+         $k = undef;
+         next;
+      }
+      if (ref $arg eq 'HASH') {
+         while (my ($k, $v) = each %$arg) {
+            $dref->{$k} = $v;
+         }
+      } elsif (ref $arg eq 'ARRAY') {
+         while (@$arg > 1) {
+            my $v = pop @$arg;
+            my $k = pop @$arg;
+            $dref->{$k} = $v;
+         }
+         print $MsgFH "! ${pkg}::$pub(): wrong array member count!\n"
+            if @$arg != 0 && ($flags & DEBUG);
+      } else {
+         $k = $arg;
+      }
+   }
+   print $MsgFH "! ${pkg}::$pub(): '$k' key without a value\n"
+      if defined $k && ($flags & DEBUG);
+   $dref
+} # }}}
+
+sub _array_set { # {{{
+   my ($pkg, $self, $pub, $datum) = (shift, shift, shift, shift);
+   my $dref = $self->{$datum};
+
+   $dref = $self->{$datum} = [] unless defined $dref;
+
+   foreach my $arg (@_) {
+      if (ref $arg eq 'ARRAY') {
+         push @$dref, $_ foreach (@$arg);
+      } elsif (ref $arg eq 'HASH') {
+         while (my ($k, $v) = each %$arg) {
+            push @$dref, $k;
+            push @$dref, $v;
+         }
+      } else {
+         push @$dref, $arg;
+      }
+   }
+   $dref
 } # }}}
 
 sub _ctor_dbg { # {{{
@@ -353,7 +329,6 @@ j_OVW:}
       print $MsgFH "${pkg}: $class->new(): odd argument discarded!\n";
    }
 
-   # Use generic internal accessors here
    while (@$argaref) {
       $k = shift @$argaref;
       $i = '_' . $k;
@@ -366,14 +341,14 @@ j_OVW:}
       next unless exists $tfields->{$i};
 
       if (ref $tfields->{$i} eq 'ARRAY') {
-         $self->_SymObj_ArraySet('new()', $i, $j);
+         Symobj::_array_set($pkg, $self, $k, $i, $j);
       } elsif (ref $tfields->{$i} eq 'HASH') {
          unless (ref $j eq 'ARRAY' || ref $j eq 'HASH') {
             print $MsgFH "${pkg}: $class->new(): ",
                "'$k' requires ARRAY or HASH argument\n";
             next;
          }
-         $self->_SymObj_HashSet('new()', $i, $j);
+         Symobj::_hash_set($pkg, $self, $k, $i, $j);
       } else {
          $self->{$i} = $j;
       }
@@ -447,12 +422,12 @@ j_OVW:}
       next unless exists $tfields->{$i};
 
       if (ref $tfields->{$i} eq 'ARRAY') {
-         $self->_SymObj_ArraySet('new()', $i, $j);
+         Symobj::_array_set($pkg, $self, $k, $i, $j);
       } elsif (ref $tfields->{$i} eq 'HASH') {
          unless (ref $j eq 'ARRAY' || ref $j eq 'HASH') {
             next;
          }
-         $self->_SymObj_HashSet('new()', $i, $j);
+         Symobj::_hash_set($pkg, $self, $k, $i, $j);
       } else {
          $self->{$i} = $j;
       }
@@ -493,9 +468,9 @@ sub _ctor_cleanhier { # {{{
       my $v = shift @$argaref;
       my $tv = ${$allargs->{$k}};
       if (ref $tv eq 'ARRAY') {
-         $self->_SymObj_ArraySet('new()', $pk, $v);
+         Symobj::_array_set($pkg, $self, $k, $pk, $v);
       } elsif (ref $tv eq 'HASH') {
-         $self->_SymObj_HashSet('new()', $pk, $v);
+         Symobj::_hash_set($pkg, $self, $k, $pk, $v);
       } else {
          $self->{$pk} = $v;
       }
@@ -893,14 +868,6 @@ resolved).
 =item C<new()>
 
 The auto-generated public class constructor.
-
-=item C<_SymObj_ArraySet()>
-
-Shared array handler, only if needed.
-
-=item C<_SymObj_HashSet()>
-
-Shared hash handler, only if needed.
 
 =back
 
