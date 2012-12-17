@@ -30,13 +30,13 @@ sub _USRMASK()    { 0x7 }
 
 sub _CLEANHIER()  { 1<<5 }
 
-sub _UUID         { 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD'; }
+sub _UUID         { 'S-SymObj::1C8288D6-9EDA-4ECD-927F-2144B94186AD' }
 
 our $MsgFH = *STDERR;
 our $Debug = 1; # 0,1,2
 
 sub pack_exists {
-   %{"${_[0]}::"};
+   %{"${_[0]}::"}
 }
 
 sub sym_dump {
@@ -45,13 +45,13 @@ sub sym_dump {
    if (my $i = ref $pkg) { $pkg = $i; }
    foreach (keys %{*{"${pkg}::"}}) { print $MsgFH "$_ "; }
    #while (my ($k, $v) = each %{*{"${pkg}::"}}) { print $MsgFH "$k($v) "; }
-   print $MsgFH "\n";
+   print $MsgFH "\n"
 }
 
 sub obj_dump {
    use Data::Dumper;
    my $self = shift;
-   print $MsgFH "SymObj::obj_dump(): ", Dumper($self), "\n";
+   print $MsgFH "SymObj::obj_dump(): ", Dumper($self), "\n"
 }
 
 sub sym_create { # {{{
@@ -217,6 +217,53 @@ sub sym_create { # {{{
    1
 } # }}}
 
+sub _resolve_tree { # {{{
+   my ($pkg, $_actorargs, $_p, $_f, $_isa) = @_;
+   foreach my $c (@{${"${_p}::"}{ISA}}) {
+      unless (%{"${c}::"}) {
+         print $MsgFH "${pkg}: $_p: \@ISA contains non-existent ",
+            "class '$c'!\n" if $$_f & DEBUG;
+         next;
+      }
+
+      my $j = ${"${c}::"}{_SymObj_FLAGS};
+      unless (defined $j) {
+         print $MsgFH "${pkg}: $_p:  '$c' not SymObj managed: hierarchy not ",
+            "clean, STOP!\n" if $$_f & VERBOSE;
+         $$_f &= ~_CLEANHIER;
+         next;
+      }
+      $$_f |= $j & (DEBUG | VERBOSE); # Inherit debug states
+      if (! ($j & _CLEANHIER) && ($$_f & _CLEANHIER)) {
+         $$_f &= ~_CLEANHIER;
+         print $MsgFH "${pkg}: $_p: '$c' says hierarchy is not clean..\n"
+            if $$_f & VERBOSE;
+      }
+
+      while (my ($k, $v) = each %{${"${c}::"}{_SymObj_ALL_CTOR_ARGS}}) {
+         $_actorargs->{$k} = $v;
+      }
+
+      _resolve_tree($pkg, $_actorargs, $c, $_f, $_isa)
+         if defined ${"${c}::"}{ISA};
+      push @$_isa, $c;
+   }
+   1
+} # }}}
+
+sub _complain_exclude {
+   my ($pkg, $pub) = @_;
+   print $MsgFH "${pkg}::$pub(): field can't be accessed through object, ",
+      "accessing class-static!\n";
+   1
+}
+
+sub _complain_rdonly {
+   my ($pkg, $pub) = @_;
+   print $MsgFH "${pkg}::$pub(): write access to READONLY field!\n";
+   1
+}
+
 sub _hash_set { # {{{
    my ($pkg, $self, $pub, $datum) = (shift, shift, shift, shift);
    my ($flags, $dref, $k) = (${"${pkg}::"}{_SymObj_FLAGS}, $self->{$datum});
@@ -269,6 +316,23 @@ sub _array_set { # {{{
       }
    }
    $dref
+} # }}}
+
+sub _find_usr_ctor { # {{{
+   # No constructor was given to sym_create(), or it was no code-ref.
+   # Try to find out what the user wants.
+   my ($self, $pkg, $ctor) = @_;
+   my $flags = ${"${pkg}::"}{_SymObj_FLAGS};
+   unless (defined ${"${pkg}::"}{$ctor}) {
+      print $MsgFH "${pkg}: no user ctor\n" if $flags & VERBOSE;
+      delete ${"${pkg}::"}{_SymObj_USR_CTOR};
+   } else {
+      print $MsgFH "${pkg}: resolved user ctor '$ctor'\n" if $flags & VERBOSE;
+      $ctor = ${"${pkg}::"}{$ctor};
+      ${"${pkg}::"}{_SymObj_USR_CTOR} = $ctor;
+      &$ctor($self);
+   }
+   1
 } # }}}
 
 sub _ctor_dbg { # {{{
@@ -379,7 +443,7 @@ j_OVW:}
    if (defined($i = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
       &$i($self);
    }
-   $self;
+   $self
 } # }}}
 
 sub _ctor_dirtyhier { # (Stripped version of _dbg) {{{
@@ -416,7 +480,7 @@ j_OVW:}
       $k = shift @$argaref;
       $i = '_' . $k;
       $j = shift @$argaref;
-      unless (exists $actorargs->{$k}) {
+      unless (exists $actorargs->{$k}) { # XXX tfields test next sufficient?!
          next;
       }
       next unless exists $tfields->{$i};
@@ -451,7 +515,7 @@ j_OVW:}
    if (defined($i = ${"${pkg}::"}{_SymObj_USR_CTOR})) {
       &$i($self);
    }
-   $self;
+   $self
 } # }}}
 
 sub _ctor_cleanhier { # {{{
@@ -500,69 +564,8 @@ sub _ctor_cleanhier { # {{{
          &$sym($self);
       }
    }
-   $self;
+   $self
 } # }}}
-
-sub _resolve_tree { # {{{
-   my ($pkg, $_actorargs, $_p, $_f, $_isa) = @_;
-   foreach my $c (@{${"${_p}::"}{ISA}}) {
-      unless (%{"${c}::"}) {
-         print $MsgFH "${pkg}: $_p: \@ISA contains non-existent ",
-            "class '$c'!\n" if $$_f & DEBUG;
-         next;
-      }
-
-      my $j = ${"${c}::"}{_SymObj_FLAGS};
-      unless (defined $j) {
-         print $MsgFH "${pkg}: $_p:  '$c' not SymObj managed: hierarchy not ",
-            "clean, STOP!\n" if $$_f & VERBOSE;
-         $$_f &= ~_CLEANHIER;
-         next;
-      }
-      $$_f |= $j & (DEBUG | VERBOSE); # Inherit debug states
-      if (! ($j & _CLEANHIER) && ($$_f & _CLEANHIER)) {
-         $$_f &= ~_CLEANHIER;
-         print $MsgFH "${pkg}: $_p: '$c' says hierarchy is not clean..\n"
-            if $$_f & VERBOSE;
-      }
-
-      while (my ($k, $v) = each %{${"${c}::"}{_SymObj_ALL_CTOR_ARGS}}) {
-         $_actorargs->{$k} = $v;
-      }
-
-      _resolve_tree($pkg, $_actorargs, $c, $_f, $_isa)
-         if defined ${"${c}::"}{ISA};
-      push @$_isa, $c;
-   }
-} # }}}
-
-sub _complain_exclude {
-   my ($pkg, $pub) = @_;
-   print $MsgFH "${pkg}::$pub(): field can't be accessed through object, ",
-      "accessing class-static!\n";
-}
-
-sub _complain_rdonly {
-   my ($pkg, $pub) = @_;
-   print $MsgFH "${pkg}::$pub(): write access to READONLY field!\n";
-}
-
-sub _find_usr_ctor { # {{{
-   # No constructor was given to sym_create(), or it was no code-ref.
-   # Try to find out what the user wants.
-   my ($self, $pkg, $ctor) = @_;
-   my $flags = ${"${pkg}::"}{_SymObj_FLAGS};
-   unless (defined ${"${pkg}::"}{$ctor}) {
-      print $MsgFH "${pkg}: no user ctor\n" if $flags & VERBOSE;
-      delete ${"${pkg}::"}{_SymObj_USR_CTOR};
-   } else {
-      print $MsgFH "${pkg}: resolved user ctor '$ctor'\n" if $flags & VERBOSE;
-      $ctor = ${"${pkg}::"}{$ctor};
-      ${"${pkg}::"}{_SymObj_USR_CTOR} = $ctor;
-      &$ctor($self);
-   }
-} # }}}
-
 1;
 __END__
 # POD {{{
