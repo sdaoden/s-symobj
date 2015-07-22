@@ -30,6 +30,9 @@ at http://sdaoden.users.sourceforge.net/code.html.  It is developed
 using a git(1) repository, which is located at
 git.code.sf.net/p/ssymobj/code (or browse it at
 http://sourceforge.net/p/ssymobj/code/).
+The repository has also been mirrored to https://GitLab.com:
+https://gitlab.com/sdaoden/s-web42.git (browse it at
+https://gitlab.com/sdaoden/s-web42/).
 
 Installation
 ------------
