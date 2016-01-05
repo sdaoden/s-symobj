@@ -1,9 +1,9 @@
 #@ (S-)Sym(bolic)Obj(ect) - easy creation of symbol tables and objects.
 package SymObj;
 require 5.008_001;
-our $VERSION = '0.8.0';
+our $VERSION = '0.8.1';
 our $COPYRIGHT =<<__EOT__;
-Copyright (c) 2010 - 2012 Steffen "Daode" Nurpmeso <sdaoden\@users.sf.net>.
+Copyright (c) 2010 - 2016 Steffen (Daode) Nurpmeso <steffen\@sdaoden.eu>.
 All rights reserved under the terms of the ISC license.
 __EOT__
 # Permission to use, copy, modify, and/or distribute this software for any
@@ -666,16 +666,14 @@ is logical, because non-managed classes do not contain the necessary
 information for S-SymObj to function.
 
 The SymObj module is available on CPAN.  The S-SymObj project is located
-at L<http://sdaoden.users.sourceforge.net/code.html>.  It is developed
-using a git(1) repository, which is located at
-C<git.code.sf.net/p/ssymobj/code> (or browse it at
-L<http://sourceforge.net/p/ssymobj/code/>).
+at L<https://www.sdaoden.eu/code.html>.  It is developed using a git(1)
+repository, which is located at C<git://git.sdaoden.eu/s-symobj.git>.
 
 =head1 INTERFACE
 
 =over
 
-=item C<$VERSION> (string, i.e., '0.8.0')
+=item C<$VERSION> (string, i.e., '0.8.1')
 
 A version string.
 

@@ -1,9 +1,9 @@
 S-SymObj
 ========
 
-:Author:    Steffen "Daode" Nurpmeso
-:Contact:   sdaoden@users.sf.net
-:Date:      2010 - 2012
+:Author:    Steffen (Daode) Nurpmeso
+:Contact:   steffen@sdaoden.eu
+:Date:      2010 - 2012, 2016
 :Copyright: All rights reserved under the terms of the ISC license.
 :Status:    Have fun.
 
@@ -26,13 +26,12 @@ S-SymObj, then indeed a super-fast super-lean constructor implementation
 is used that'll rock your house.
 
 The SymObj module is available on CPAN.  The S-SymObj project is located
-at http://sdaoden.users.sourceforge.net/code.html.  It is developed
-using a git(1) repository, which is located at
-git.code.sf.net/p/ssymobj/code (or browse it at
-http://sourceforge.net/p/ssymobj/code/).
-The repository has also been mirrored to https://GitLab.com:
-https://gitlab.com/sdaoden/s-web42.git (browse it at
-https://gitlab.com/sdaoden/s-web42/).
+at https://www.sdaoden.eu/code.html.  It is developed using a git(1)
+repository, which is located at git://git.sdaoden.eu/s-symobj.git.
+A SourceForge.net mirror is at git.code.sf.net/p/ssymobj/code (or browse it
+at http://sourceforge.net/p/ssymobj/code/), and a GitLab.com mirror is at
+https://gitlab.com/sdaoden/s-symobj.git (browse it at
+https://gitlab.com/sdaoden/s-symobj/).
 
 Installation
 ------------

@@ -8,7 +8,7 @@ WriteMakefile(
 	'VERSION_FROM'	=> 'lib/SymObj.pm',
 	(
 	ABSTRACT	=> 'Easy creation of symbol-tables and objects',
-	AUTHOR		=> 'Steffen "Daode" Nurpmeso <sdaoden@users.sf.net>',
+	AUTHOR		=> 'Steffen (Daode) Nurpmeso <steffen@sdaoden.eu>',
 	LICENSE		=> 'ISC',
 	)
 );
