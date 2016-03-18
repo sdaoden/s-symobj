@@ -667,7 +667,8 @@ information for S-SymObj to function.
 
 The SymObj module is available on CPAN.  The S-SymObj project is located
 at L<https://www.sdaoden.eu/code.html>.  It is developed using a git(1)
-repository, which is located at C<git://git.sdaoden.eu/s-symobj.git>.
+repository, which is located at C<https://git.sdaoden.eu/scm/s-symobj.git>
+(browse it at C<https://git.sdaoden.eu/cgit/s-symobj.git>).
 
 =head1 INTERFACE
 
