@@ -745,11 +745,11 @@ hash members are I<recursively> cloned in addition.  E.g.:
 
 This flag will be overwritten by subclasses, i.e., the C<DEEP_CLONE>
 state of the I<actually instantiated> subclass is what is used to
-decide wether deep cloning shall be performed or not.
+decide whether deep cloning shall be performed or not.
 
 =item C<pack_exists(C<$1>=string=package/class)>
 
-Check wether the class (package) $1 exists.
+Check whether the class (package) $1 exists.
 
 =item C<sym_dump($1=string OR object=symbol table target)>
 
