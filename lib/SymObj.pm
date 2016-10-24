@@ -1,7 +1,7 @@
 #@ (S-)Sym(bolic)Obj(ect) - easy creation of symbol tables and objects.
 package SymObj;
 require 5.008_001;
-our $VERSION = '0.8.1';
+our $VERSION = '0.8.2';
 our $COPYRIGHT =<<__EOT__;
 Copyright (c) 2010 - 2016 Steffen (Daode) Nurpmeso <steffen\@sdaoden.eu>.
 All rights reserved under the terms of the ISC license.
@@ -674,7 +674,7 @@ repository, which is located at C<https://git.sdaoden.eu/scm/s-symobj.git>
 
 =over
 
-=item C<$VERSION> (string, i.e., '0.8.1')
+=item C<$VERSION> (string, i.e., '0.8.2')
 
 A version string.
 
@@ -907,11 +907,16 @@ The auto-generated public class constructor.
 
 =over
 
-=item v0.8.1
+=item v0.8.2, 2016-12-24
+
+Fixed false spelling, updated URLs, new source-code style.
+No functional change (since v0.8.0, 2012-12-17).
+
+=item v0.8.1, 2013-02-02
 
 Only housekeeping updates (URLs, copyright, etc).
 
-=item v0.8.0
+=item v0.8.0, 2012-12-17
 
 Support for L<"DEEP_CLONE"> was added.
 The code has been reordered.
