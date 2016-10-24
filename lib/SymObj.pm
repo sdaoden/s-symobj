@@ -23,15 +23,15 @@ use warnings;
 use strict;
 no strict 'refs'; # We fool around with that by definition, so this
 
-sub NONE() {0}
-sub DEBUG() {1<<0}
-sub VERBOSE() {1<<1}
-sub DEEP_CLONE() {1<<2}
-sub _USRMASK() {0x7}
+sub NONE(){ 0 }
+sub DEBUG(){ 1<<0 }
+sub VERBOSE(){ 1<<1 }
+sub DEEP_CLONE(){ 1<<2 }
+sub _USRMASK(){ 0x7 }
 
-sub _CLEANHIER() {1<<5}
+sub _CLEANHIER(){ 1<<5 }
 
-sub _UUID {'S_SymObj__1C8288D6_9EDA_4ECD_927F_2144B94186AD'}
+sub _UUID(){ 'S_SymObj__1C8288D6_9EDA_4ECD_927F_2144B94186AD' }
 
 our $MsgFH = *STDERR;
 our $Debug = 1; # 0,1,2
@@ -73,14 +73,14 @@ sub sym_create{ # {{{
    push @isa, $pkg;
 
    print $MsgFH ".. (inherited VERBOSE:) SymObj::sym_create(): $pkg\n"
-      if ($flags & VERBOSE) && ! $i;
+      if ($flags & VERBOSE) && !$i;
 
    # Create accessor symtable entries
    foreach $j (keys %$tfields){
-      sub TYPE_ARRAY() {1<<0}
-      sub TYPE_HASH() {1<<1}
-      sub TYPE_EXCLUDE() {1<<2}
-      sub TYPE_RDONLY() {1<<3}
+      sub TYPE_ARRAY(){ 1<<0 }
+      sub TYPE_HASH(){ 1<<1 }
+      sub TYPE_EXCLUDE(){ 1<<2 }
+      sub TYPE_RDONLY(){ 1<<3 }
       my ($xj, $pj, $tj) = ($j, $j, 0);
 
       $j =~ /^([@%])?([?!])?(_)?(.*)/;
@@ -90,7 +90,7 @@ sub sym_create{ # {{{
          if !defined $3 && ($flags & DEBUG);
       unless(defined $4 && length $4){
          print $MsgFH "\tSymbol '$pj': consists only of modifier and/or ",
-            "typedef and/or underscore!  Skip!!\n" if $flags & DEBUG;
+            "typedef and/or underscore!  Skip!!\n" if ($flags & DEBUG);
          delete $tfields->{$j};
          next
       }
@@ -128,7 +128,7 @@ sub sym_create{ # {{{
             if(($self = ref $self) && %{"${self}::"}){
                $self = shift;
                if($tj & TYPE_EXCLUDE){
-                  SymObj::_complain_exclude($pkg, $pj) if $flags & DEBUG;
+                  SymObj::_complain_exclude($pkg, $pj) if ($flags & DEBUG);
                   $self = $tfields
                }
             }else{
@@ -150,7 +150,7 @@ sub sym_create{ # {{{
             if(($self = ref $self) && %{"${self}::"}){
                $self = shift;
                if($tj & TYPE_EXCLUDE){
-                  SymObj::_complain_exclude($pkg, $pj) if $flags & DEBUG;
+                  SymObj::_complain_exclude($pkg, $pj) if ($flags & DEBUG);
                   $self = $tfields
                }
             }else{
@@ -167,14 +167,14 @@ sub sym_create{ # {{{
       }else{
          # Scalar (or "typeless")
          print $MsgFH "\tsub $pj: scalar-based ('untyped')\n"
-            if $flags & VERBOSE;
+            if ($flags & VERBOSE);
          *{"${pkg}::__$pj"} = sub{ \$_[0]->{$xj} };
          *{"${pkg}::$pj"} = sub{
             my $self = $_[0];
             if(($self = ref $self) && %{"${self}::"}){
                $self = shift;
                if($tj & TYPE_EXCLUDE){
-                  SymObj::_complain_exclude($pkg, $pj) if $flags & DEBUG;
+                  SymObj::_complain_exclude($pkg, $pj) if ($flags & DEBUG);
                   $self = $tfields
                }
             }else{
@@ -217,7 +217,7 @@ sub sym_create{ # {{{
          $self = SymObj::_ctor_argembed($pkg, $class, $self, \%actorargs,
                \%actorargs, \@_);
          # Fill what is not yet filled from arguments..
-         my $f = $flags & DEEP_CLONE;
+         my $f = ($flags & DEEP_CLONE);
          while(($i, $j) = each %actorargs){
             $i = '_' . $i;
             next if exists $self->{$i};
@@ -270,14 +270,14 @@ sub _resolve_tree{ # {{{
    foreach my $c (@{${"${_p}::"}{ISA}}){
       unless(%{"${c}::"}){
          print $MsgFH "${pkg}: $_p: \@ISA contains non-existent ",
-            "class '$c'!\n" if $$_f & DEBUG;
+            "class '$c'!\n" if ($$_f & DEBUG);
          next
       }
 
       my $j = ${"${c}::"}{_SymObj_FLAGS};
       unless(defined $j){
          print $MsgFH "${pkg}: $_p:  '$c' not SymObj managed: hierarchy not ",
-            "clean, STOP!\n" if $$_f & VERBOSE;
+            "clean, STOP!\n" if ($$_f & VERBOSE);
          $$_f &= ~_CLEANHIER;
          next
       }
@@ -285,7 +285,7 @@ sub _resolve_tree{ # {{{
       if(!($j & _CLEANHIER) && ($$_f & _CLEANHIER)){
          $$_f &= ~_CLEANHIER;
          print $MsgFH "${pkg}: $_p: '$c' says hierarchy is not clean..\n"
-            if $$_f & VERBOSE
+            if ($$_f & VERBOSE)
       }
 
       while(my ($k, $v) = each %{${"${c}::"}{_SymObj_ALL_CTOR_ARGS}}){
@@ -372,10 +372,10 @@ sub _find_usr_ctor{ # {{{
    my ($self, $pkg, $ctor) = @_;
    my $flags = ${"${pkg}::"}{_SymObj_FLAGS};
    unless(defined ${"${pkg}::"}{$ctor}){
-      print $MsgFH "${pkg}: no user ctor\n" if $flags & VERBOSE;
+      print $MsgFH "${pkg}: no user ctor\n" if ($flags & VERBOSE);
       delete ${"${pkg}::"}{_SymObj_USR_CTOR}
    }else{
-      print $MsgFH "${pkg}: resolved user ctor '$ctor'\n" if $flags & VERBOSE;
+      print $MsgFH "${pkg}: resolved user ctor '$ctor'\n" if ($flags & VERBOSE);
       $ctor = ${"${pkg}::"}{$ctor};
       ${"${pkg}::"}{_SymObj_USR_CTOR} = $ctor;
       &$ctor($self)
@@ -387,7 +387,7 @@ sub _ctor_dbg{ # {{{
    my ($pkg, $class, $argaref) = @_;
    my $flags = ${"${pkg}::"}{_SymObj_FLAGS};
    print $MsgFH "SymObj::obj_ctor <> new: $pkg called as $class\n"
-      if $flags & VERBOSE;
+      if ($flags & VERBOSE);
 
    my ($self, $actorargs, $ctorovers, $tfields, $init_chain, $i, $j, $k) =
       (undef, ${"${pkg}::"}{_SymObj_ALL_CTOR_ARGS},
@@ -541,7 +541,7 @@ sub _ctor_argembed{ # {{{
 
       if(ref $r eq 'ARRAY'){
          Symobj::_array_set($pkg, $self, $k, $pk, $v)
-      }elsif (ref $r eq 'HASH'){
+      }elsif(ref $r eq 'HASH'){
          unless(ref $v eq 'ARRAY' || ref $v eq 'HASH'){
             print $MsgFH "${pkg}: $class->new(): ",
                "'$k' requires ARRAY or HASH argument\n";
