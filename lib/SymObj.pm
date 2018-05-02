@@ -1,10 +1,10 @@
 #@ (S-)Sym(bolic)Obj(ect) - easy creation of symbol tables and objects.
 package SymObj;
 require 5.008_001;
-our $VERSION = '0.8.2';
+our $VERSION = '0.8.2-dirty';
 our $COPYRIGHT =<<__EOT__;
-Copyright (c) 2010 - 2016 Steffen (Daode) Nurpmeso <steffen\@sdaoden.eu>.
-All rights reserved under the terms of the ISC license.
+Copyright (c) 2010 - 2018 Steffen (Daode) Nurpmeso <steffen\@sdaoden.eu>.
+ISC license.
 __EOT__
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -941,8 +941,8 @@ point out that i wrote this package the hard way.  It is I.
 
 =head1 LICENSE
 
-Copyright (c) 2010 - 2016 Steffen (Daode) Nurpmeso.
-All rights reserved under the terms of the ISC license.
+Copyright (c) 2010 - 2018 Steffen (Daode) Nurpmeso.
+ISC license.
 
 =cut
 # }}}
