@@ -18,7 +18,7 @@ __EOT__
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-use diagnostics -verbose;
+#use diagnostics -verbose;
 use warnings;
 use strict;
 no strict 'refs'; # We fool around with that by definition, so this
