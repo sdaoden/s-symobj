@@ -1,9 +1,9 @@
 S-SymObj
 ========
 
-:Author:    Steffen (Daode) Nurpmeso
+:Author:    Steffen Nurpmeso
 :Contact:   steffen@sdaoden.eu
-:Date:      2010 - 2012, 2016, 2018
+:Date:      2010 - 2012, 2016, 2018, 2020
 :Copyright: ISC license.
 :Status:    Have fun.
 
@@ -28,7 +28,7 @@ is used that'll rock your house.
 The SymObj module is available on CPAN.  The S-SymObj project is located
 at https://www.sdaoden.eu/code.html.  It is developed using a git(1)
 repository, which is located at https://git.sdaoden.eu/scm/s-symobj.git
-(browse it at https://git.sdaoden.eu/git/s-symobj.git).
+(browse it at https://git.sdaoden.eu/cgit/s-symobj.git).
 
 Installation
 ------------

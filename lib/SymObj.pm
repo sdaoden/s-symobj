@@ -3,7 +3,7 @@ package SymObj;
 require 5.008_001;
 our $VERSION = '0.8.2-dirty';
 our $COPYRIGHT =<<__EOT__;
-Copyright (c) 2010 - 2018 Steffen (Daode) Nurpmeso <steffen\@sdaoden.eu>.
+Copyright (c) 2010 - 2020 Steffen Nurpmeso <steffen\@sdaoden.eu>.
 ISC license.
 __EOT__
 # Permission to use, copy, modify, and/or distribute this software for any
@@ -23,15 +23,15 @@ use warnings;
 use strict;
 no strict 'refs'; # We fool around with that by definition, so this
 
-sub NONE(){ 0 }
-sub DEBUG(){ 1<<0 }
-sub VERBOSE(){ 1<<1 }
-sub DEEP_CLONE(){ 1<<2 }
-sub _USRMASK(){ 0x7 }
+sub NONE {0}
+sub DEBUG {1<<0}
+sub VERBOSE {1<<1}
+sub DEEP_CLONE {1<<2}
+sub _USRMASK {0x7}
 
-sub _CLEANHIER(){ 1<<5 }
+sub _CLEANHIER {1<<5}
 
-sub _UUID(){ 'S_SymObj__1C8288D6_9EDA_4ECD_927F_2144B94186AD' }
+sub _UUID {'S_SymObj__1C8288D6_9EDA_4ECD_927F_2144B94186AD'}
 
 our $MsgFH = *STDERR;
 our $Debug = 1; # 0,1,2
@@ -61,7 +61,7 @@ sub sym_create{ # {{{
    $flags |= DEBUG if $flags & VERBOSE;
    $flags |= $Debug > 1 ? (DEBUG | VERBOSE) : DEBUG if $Debug;
    my ($pkg, $i, $j, @isa, %actorargs, @ctorovers) =
-      (scalar caller, $flags & VERBOSE);
+         (scalar caller, $flags & VERBOSE);
    print $MsgFH "SymObj::sym_create(): $pkg\n" if $i;
 
    # For (superior debug ctor) argument checking, create a hash of
@@ -77,10 +77,10 @@ sub sym_create{ # {{{
 
    # Create accessor symtable entries
    foreach $j (keys %$tfields){
-      sub TYPE_ARRAY(){ 1<<0 }
-      sub TYPE_HASH(){ 1<<1 }
-      sub TYPE_EXCLUDE(){ 1<<2 }
-      sub TYPE_RDONLY(){ 1<<3 }
+      sub TYPE_ARRAY {1<<0}
+      sub TYPE_HASH {1<<1}
+      sub TYPE_EXCLUDE {1<<2}
+      sub TYPE_RDONLY {1<<3}
       my ($xj, $pj, $tj) = ($j, $j, 0);
 
       $j =~ /^([@%])?([?!])?(_)?(.*)/;
@@ -122,7 +122,9 @@ sub sym_create{ # {{{
       # (And hope that perl(1) optimizes away some closure conditions..)
       if(($tj & TYPE_ARRAY) || $i eq 'ARRAY'){
          print $MsgFH "\tsub $pj: array-based\n" if $flags & VERBOSE;
-         *{"${pkg}::__$pj"} = sub{ $_[0]->{$xj} };
+
+         *{"${pkg}::__$pj"} = sub {$_[0]->{$xj}};
+
          *{"${pkg}::$pj"} = sub{
             my $self = $_[0];
             if(($self = ref $self) && %{"${self}::"}){
@@ -144,7 +146,9 @@ sub sym_create{ # {{{
          };
       }elsif(($tj & TYPE_HASH) || $i eq 'HASH'){
          print $MsgFH "\tsub $pj: hash-based\n" if $flags & VERBOSE;
-         *{"${pkg}::__$pj"} = sub{ $_[0]->{$xj} };
+
+         *{"${pkg}::__$pj"} = sub {$_[0]->{$xj}};
+
          *{"${pkg}::$pj"} = sub{
             my $self = $_[0];
             if(($self = ref $self) && %{"${self}::"}){
@@ -168,7 +172,9 @@ sub sym_create{ # {{{
          # Scalar (or "typeless")
          print $MsgFH "\tsub $pj: scalar-based ('untyped')\n"
             if ($flags & VERBOSE);
-         *{"${pkg}::__$pj"} = sub{ \$_[0]->{$xj} };
+
+         *{"${pkg}::__$pj"} = sub {\$_[0]->{$xj}};
+
          *{"${pkg}::$pj"} = sub{
             my $self = $_[0];
             if(($self = ref $self) && %{"${self}::"}){
@@ -208,7 +214,7 @@ sub sym_create{ # {{{
 
    # new()
    if($flags & DEBUG){
-      $ctor = sub{ SymObj::_ctor_dbg($pkg, shift, \@_) };
+      $ctor = sub {SymObj::_ctor_dbg($pkg, shift, \@_)};
    }elsif($flags & _CLEANHIER){
       $ctor = sub{
          my ($class, $self) = (shift, {});
@@ -232,9 +238,10 @@ sub sym_create{ # {{{
          $self
       };
    }else{
-      $ctor = sub{ SymObj::_ctor_dirtyhier($pkg, shift, \@_) }
+      $ctor = sub {SymObj::_ctor_dirtyhier($pkg, shift, \@_)}
    }
    *{"${pkg}::new"} = $ctor;
+
    1
 } # }}}
 
@@ -248,7 +255,7 @@ sub clone_ref{ # {{{
          $r = \@a;
       }elsif(ref $r eq 'HASH'){
          my (%h, $hk, $hv);
-         while(($hk, $hv) = each %$r){ $h{$hk} = $hv }
+         while(($hk, $hv) = each %$r) {$h{$hk} = $hv}
          $r = \%h
       }
    }else{
@@ -258,10 +265,11 @@ sub clone_ref{ # {{{
          $r = \@a
       }elsif(ref $r eq 'HASH'){
          my (%h, $hk, $hv);
-         while(($hk, $hv) = each %$r){ $h{$hk} = SymObj::clone_ref($hv, 1) }
+         while(($hk, $hv) = each %$r) {$h{$hk} = SymObj::clone_ref($hv, 1)}
          $r = \%h
       }
    }
+
    $r
 } # }}}
 
@@ -270,14 +278,14 @@ sub _resolve_tree{ # {{{
    foreach my $c (@{${"${_p}::"}{ISA}}){
       unless(%{"${c}::"}){
          print $MsgFH "${pkg}: $_p: \@ISA contains non-existent ",
-            "class '$c'!\n" if ($$_f & DEBUG);
+               "class '$c'!\n" if ($$_f & DEBUG);
          next
       }
 
       my $j = ${"${c}::"}{_SymObj_FLAGS};
       unless(defined $j){
          print $MsgFH "${pkg}: $_p:  '$c' not SymObj managed: hierarchy not ",
-            "clean, STOP!\n" if ($$_f & VERBOSE);
+               "clean, STOP!\n" if ($$_f & VERBOSE);
          $$_f &= ~_CLEANHIER;
          next
       }
@@ -407,7 +415,8 @@ sub _ctor_dbg{ # {{{
          }
          push @$argaref, $k;
          push @$argaref, $tfields->{'_' . $k};
-j_OVW:}
+j_OVW:
+      }
 
       # Walk the new() chain, but disallow arg-checking for superclasses
       unshift @$argaref, _UUID if !$init_chain;
@@ -424,7 +433,7 @@ j_OVW:}
          # (MI restriction applies here: if $self is yet a {} the other tree
          # can only be joined in and thus looses it's hash-pointer)
          $self = $i and next unless defined $self;
-         while(($k, $j) = each %$i){ $self->{$k} = $j }
+         while(($k, $j) = each %$i) {$self->{$k} = $j}
       }
 
       shift @$argaref if !$init_chain
@@ -544,7 +553,7 @@ sub _ctor_argembed{ # {{{
       }elsif(ref $r eq 'HASH'){
          unless(ref $v eq 'ARRAY' || ref $v eq 'HASH'){
             print $MsgFH "${pkg}: $class->new(): ",
-               "'$k' requires ARRAY or HASH argument\n";
+                  "'$k' requires ARRAY or HASH argument\n";
             next
          }
          Symobj::_hash_set($pkg, $self, $k, $pk, $v)
@@ -907,12 +916,12 @@ The auto-generated public class constructor.
 
 =over
 
-=item v0.8.2, 2016-12-24
+=item v0.8.2, 2016-10-24
 
 Fixed false spelling, updated URLs, new source-code style.
 No functional change (since v0.8.0, 2012-12-17).
 
-=item v0.8.1, 2013-02-02
+=item v0.8.1, 2016-01-05
 
 Only housekeeping updates (URLs, copyright, etc).
 
@@ -941,7 +950,7 @@ point out that i wrote this package the hard way.  It is I.
 
 =head1 LICENSE
 
-Copyright (c) 2010 - 2018 Steffen (Daode) Nurpmeso.
+Copyright (c) 2010 - 2020 Steffen Nurpmeso.
 ISC license.
 
 =cut
