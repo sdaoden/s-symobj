@@ -3,7 +3,7 @@ package SymObj;
 require 5.008_001;
 our $VERSION = '0.8.2-dirty';
 our $COPYRIGHT =<<__EOT__;
-Copyright (c) 2010 - 2020 Steffen Nurpmeso <steffen\@sdaoden.eu>.
+Copyright (c) 2010 - 2021 Steffen Nurpmeso <steffen\@sdaoden.eu>.
 ISC license.
 __EOT__
 # Permission to use, copy, modify, and/or distribute this software for any
@@ -677,7 +677,7 @@ information for S-SymObj to function.
 The SymObj module is available on CPAN.  The S-SymObj project is located
 at L<https://www.sdaoden.eu/code.html>.  It is developed using a git(1)
 repository, which is located at C<https://git.sdaoden.eu/scm/s-symobj.git>
-(browse it at L<https://git.sdaoden.eu/cgit/s-symobj.git>).
+(browse it at L<https://git.sdaoden.eu/browse/s-symobj.git>).
 
 =head1 INTERFACE
 
@@ -950,7 +950,7 @@ point out that i wrote this package the hard way.  It is I.
 
 =head1 LICENSE
 
-Copyright (c) 2010 - 2020 Steffen Nurpmeso.
+Copyright (c) 2010 - 2021 Steffen Nurpmeso.
 ISC license.
 
 =cut
