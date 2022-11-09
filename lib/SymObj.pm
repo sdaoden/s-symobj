@@ -1,9 +1,9 @@
 #@ (S-)Sym(bolic)Obj(ect) - easy creation of symbol tables and objects.
 package SymObj;
 require 5.008_001;
-our $VERSION = '0.8.2-dirty';
+our $VERSION = '0.8.3';
 our $COPYRIGHT =<<__EOT__;
-Copyright (c) 2010 - 2021 Steffen Nurpmeso <steffen\@sdaoden.eu>.
+Copyright (c) 2010 - 2022 Steffen Nurpmeso <steffen\@sdaoden.eu>.
 ISC license.
 __EOT__
 # Permission to use, copy, modify, and/or distribute this software for any
@@ -36,532 +36,506 @@ sub _UUID {'S_SymObj__1C8288D6_9EDA_4ECD_927F_2144B94186AD'}
 our $MsgFH = *STDERR;
 our $Debug = 1; # 0,1,2
 
-sub pack_exists{
-   %{"${_[0]}::"}
-}
+sub pack_exists {%{"${_[0]}::"}}
 
 sub sym_dump{
-   my ($pkg) = @_;
-   print $MsgFH "SymObj::sym_dump($pkg):\n\t";
-   if(my $i = ref $pkg){ $pkg = $i }
-   foreach(keys %{*{"${pkg}::"}}){ print $MsgFH "$_ " }
-   #while(my ($k, $v) = each %{*{"${pkg}::"}}){ print $MsgFH "$k($v) " }
-   print $MsgFH "\n"
+	my ($pkg) = @_;
+	print $MsgFH "SymObj::sym_dump($pkg):\n\t";
+	if(my $i = ref $pkg) {$pkg = $i}
+	foreach(keys %{*{"${pkg}::"}}) {print $MsgFH "$_ "}
+	#while(my ($k, $v) = each %{*{"${pkg}::"}}){ print $MsgFH "$k($v) " }
+	print $MsgFH "\n"
 }
 
 sub obj_dump{
-   use Data::Dumper;
-   my $self = shift;
-   print $MsgFH "SymObj::obj_dump(): ", Dumper($self), "\n"
+	use Data::Dumper;
+	my $self = shift;
+	print $MsgFH "SymObj::obj_dump(): ", Dumper($self), "\n"
 }
 
 sub sym_create{ # {{{
-   my ($flags, $tfields, $ctor) = @_;
-   $flags &= _USRMASK;
-   $flags |= DEBUG if $flags & VERBOSE;
-   $flags |= $Debug > 1 ? (DEBUG | VERBOSE) : DEBUG if $Debug;
-   my ($pkg, $i, $j, @isa, %actorargs, @ctorovers) =
-         (scalar caller, $flags & VERBOSE);
-   print $MsgFH "SymObj::sym_create(): $pkg\n" if $i;
+	my ($flags, $tfields, $ctor) = @_;
+	$flags &= _USRMASK;
+	$flags |= DEBUG if $flags & VERBOSE;
+	$flags |= $Debug > 1 ? (DEBUG | VERBOSE) : DEBUG if $Debug;
+	my ($pkg, $i, $j, @isa, %actorargs, @ctorovers) = (scalar caller, ($flags & VERBOSE));
+	print $MsgFH "SymObj::sym_create(): $pkg\n" if $i;
 
-   # For (superior debug ctor) argument checking, create a hash of
-   # public symbols (inherit those from parents first ...)
-   # Note that our @isa<->*_SymObj_ISA is flattened, in construction order
-   $flags |= _CLEANHIER;
-   _resolve_tree($pkg, \%actorargs, $pkg, \$flags, \@isa)
-      if defined ${"${pkg}::"}{ISA};
-   push @isa, $pkg;
+	# For (debug ctor) argument checking, create a hash of public symbols (inherit those from parents first ...)
+	# Note that our @isa<->*_SymObj_ISA is flattened, in construction order
+	$flags |= _CLEANHIER;
+	_resolve_tree($pkg, \%actorargs, $pkg, \$flags, \@isa) if defined ${"${pkg}::"}{ISA};
+	push @isa, $pkg;
 
-   print $MsgFH ".. (inherited VERBOSE:) SymObj::sym_create(): $pkg\n"
-      if ($flags & VERBOSE) && !$i;
+	print $MsgFH ".. (inherited VERBOSE:) SymObj::sym_create(): $pkg\n" if ($flags & VERBOSE) && !$i;
 
-   # Create accessor symtable entries
-   foreach $j (keys %$tfields){
-      sub TYPE_ARRAY {1<<0}
-      sub TYPE_HASH {1<<1}
-      sub TYPE_EXCLUDE {1<<2}
-      sub TYPE_RDONLY {1<<3}
-      my ($xj, $pj, $tj) = ($j, $j, 0);
+	# Create accessor symtable entries
+	foreach $j (keys %$tfields){
+		sub TYPE_ARRAY {1<<0}
+		sub TYPE_HASH {1<<1}
+		sub TYPE_EXCLUDE {1<<2}
+		sub TYPE_RDONLY {1<<3}
+		my ($xj, $pj, $tj) = ($j, $j, 0);
 
-      $j =~ /^([@%])?([?!])?(_)?(.*)/;
-      $tj |= $1 eq '@' ? TYPE_ARRAY : TYPE_HASH if defined $1;
-      $tj |= $2 eq '?' ? TYPE_EXCLUDE : TYPE_RDONLY if defined $2;
-      print $MsgFH "\tSymbol '$pj': does NOT start with _!  THIS WILL FAIL!!\n"
-         if !defined $3 && ($flags & DEBUG);
-      unless(defined $4 && length $4){
-         print $MsgFH "\tSymbol '$pj': consists only of modifier and/or ",
-            "typedef and/or underscore!  Skip!!\n" if ($flags & DEBUG);
-         delete $tfields->{$j};
-         next
-      }
-      $xj = (defined $3 ? $3 : '') . $4;
-      $pj = $4;
+		$j =~ /^([@%])?([?!])?(_)?(.*)/;
+		$tj |= $1 eq '@' ? TYPE_ARRAY : TYPE_HASH if defined $1;
+		$tj |= $2 eq '?' ? TYPE_EXCLUDE : TYPE_RDONLY if defined $2;
+		print $MsgFH "\tSymbol '$pj': does NOT start with _!  FAILS!!\n" if !defined $3 && ($flags & DEBUG);
+		unless(defined $4 && length $4){
+			print $MsgFH "\tSymbol '$pj': only modifier and/or typedef and/or underscore, skip!\n"
+				if ($flags & DEBUG);
+			delete $tfields->{$j};
+			next
+		}
+		$xj = (defined $3 ? $3 : '') . $4;
+		$pj = $4;
 
-      if($tj){
-         $tfields->{$xj} = $tfields->{$j};
-         delete $tfields->{$j};
-         $i = ($tj & TYPE_ARRAY) ? 'ARRAY' : ($tj & TYPE_HASH) ? 'HASH' : ''
-      }else{
-         $i = ref $tfields->{$xj}
-      }
+		if($tj){
+			$tfields->{$xj} = $tfields->{$j};
+			delete $tfields->{$j};
+			$i = ($tj & TYPE_ARRAY) ? 'ARRAY' : ($tj & TYPE_HASH) ? 'HASH' : ''
+		}else{
+			$i = ref $tfields->{$xj}
+		}
 
-      # Does any superclass define this symbol already, i.e., is this an
-      # override request?
-      if(exists $actorargs{$pj}){
-         if($i ne ref ${$actorargs{$pj}}){
-            print $MsgFH "${pkg}: overrides '$pj' of some super class ",
-               "with incompatible type!  Skip!!\n" if $flags & DEBUG;
-            delete $tfields->{$xj};
-            next
-         }
-         push @ctorovers, $pj
-         # And we do have to override the function(/method) too..
-      }
-      $actorargs{$pj} = \$tfields->{$xj};
+		# Does any superclass define this symbol already - is this an override request?
+		if(exists $actorargs{$pj}){
+			if($i ne ref ${$actorargs{$pj}}){
+				print $MsgFH "${pkg}: overrides '$pj' of some super class, type incompatible, skip!\n"
+					if ($flags & DEBUG);
+				delete $tfields->{$xj};
+				next
+			}
+			push @ctorovers, $pj
+			# And we do have to override the function(/method) too..
+		}
+		$actorargs{$pj} = \$tfields->{$xj};
 
-      # (And hope that perl(1) optimizes away some closure conditions..)
-      if(($tj & TYPE_ARRAY) || $i eq 'ARRAY'){
-         print $MsgFH "\tsub $pj: array-based\n" if $flags & VERBOSE;
+		# (And hope that perl(1) optimizes away some closure conditions..)
+		if(($tj & TYPE_ARRAY) || $i eq 'ARRAY'){
+			print $MsgFH "\tsub $pj: array-based\n" if ($flags & VERBOSE);
 
-         *{"${pkg}::__$pj"} = sub {$_[0]->{$xj}};
+			*{"${pkg}::__$pj"} = sub {$_[0]->{$xj}};
 
-         *{"${pkg}::$pj"} = sub{
-            my $self = $_[0];
-            if(($self = ref $self) && %{"${self}::"}){
-               $self = shift;
-               if($tj & TYPE_EXCLUDE){
-                  SymObj::_complain_exclude($pkg, $pj) if ($flags & DEBUG);
-                  $self = $tfields
-               }
-            }else{
-               $self = $tfields;
-            }
-            my $f = $self->{$xj};
-            if(!defined $f || @_){
-               SymObj::_complain_rdonly($pkg, $pj)
-                  if ($tj & TYPE_RDONLY) && @_ && ($flags & DEBUG);
-               $f = SymObj::_array_set($pkg, $self, $pj, $xj, @_);
-            }
-            wantarray ? @$f : $f
-         };
-      }elsif(($tj & TYPE_HASH) || $i eq 'HASH'){
-         print $MsgFH "\tsub $pj: hash-based\n" if $flags & VERBOSE;
+			*{"${pkg}::$pj"} = sub{
+				my $self = $_[0];
+				if(($self = ref $self) && %{"${self}::"}){
+					$self = shift;
+					if($tj & TYPE_EXCLUDE){
+						SymObj::_complain_exclude($pkg, $pj) if ($flags & DEBUG);
+						$self = $tfields
+					}
+				}else{
+					$self = $tfields
+				}
+				my $f = $self->{$xj};
+				if(!defined $f || @_){
+					SymObj::_complain_rdonly($pkg, $pj)
+						if ($tj & TYPE_RDONLY) && @_ && ($flags & DEBUG);
+					$f = SymObj::_array_set($pkg, $self, $pj, $xj, @_)
+				}
+				wantarray ? @$f : $f
+			};
+		}elsif(($tj & TYPE_HASH) || $i eq 'HASH'){
+			print $MsgFH "\tsub $pj: hash-based\n" if $flags & VERBOSE;
 
-         *{"${pkg}::__$pj"} = sub {$_[0]->{$xj}};
+			*{"${pkg}::__$pj"} = sub {$_[0]->{$xj}};
 
-         *{"${pkg}::$pj"} = sub{
-            my $self = $_[0];
-            if(($self = ref $self) && %{"${self}::"}){
-               $self = shift;
-               if($tj & TYPE_EXCLUDE){
-                  SymObj::_complain_exclude($pkg, $pj) if ($flags & DEBUG);
-                  $self = $tfields
-               }
-            }else{
-               $self = $tfields
-            }
-            my $f = $self->{$xj};
-            if(!defined $f || @_){
-               SymObj::_complain_rdonly($pkg, $pj)
-                  if ($tj & TYPE_RDONLY) && @_ && ($flags & DEBUG);
-               $f = SymObj::_hash_set($pkg, $self, $pj, $xj, @_)
-            }
-            wantarray ? %$f : $f
-         };
-      }else{
-         # Scalar (or "typeless")
-         print $MsgFH "\tsub $pj: scalar-based ('untyped')\n"
-            if ($flags & VERBOSE);
+			*{"${pkg}::$pj"} = sub{
+				my $self = $_[0];
+				if(($self = ref $self) && %{"${self}::"}){
+					$self = shift;
+					if($tj & TYPE_EXCLUDE){
+						SymObj::_complain_exclude($pkg, $pj) if ($flags & DEBUG);
+						$self = $tfields
+					}
+				}else{
+					$self = $tfields
+				}
+				my $f = $self->{$xj};
+				if(!defined $f || @_){
+					SymObj::_complain_rdonly($pkg, $pj)
+						if ($tj & TYPE_RDONLY) && @_ && ($flags & DEBUG);
+					$f = SymObj::_hash_set($pkg, $self, $pj, $xj, @_)
+				}
+				wantarray ? %$f : $f
+			};
+		}else{
+			# Scalar (or "typeless")
+			print $MsgFH "\tsub $pj: scalar-based ('untyped')\n" if ($flags & VERBOSE);
 
-         *{"${pkg}::__$pj"} = sub {\$_[0]->{$xj}};
+			*{"${pkg}::__$pj"} = sub {\$_[0]->{$xj}};
 
-         *{"${pkg}::$pj"} = sub{
-            my $self = $_[0];
-            if(($self = ref $self) && %{"${self}::"}){
-               $self = shift;
-               if($tj & TYPE_EXCLUDE){
-                  SymObj::_complain_exclude($pkg, $pj) if ($flags & DEBUG);
-                  $self = $tfields
-               }
-            }else{
-               $self = $tfields
-            }
-            if(@_){
-               SymObj::_complain_rdonly($pkg, $pj)
-                  if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
-               $self->{$xj} = shift
-            }
-            $self->{$xj}
-         };
-      }
-   }
+			*{"${pkg}::$pj"} = sub{
+				my $self = $_[0];
+				if(($self = ref $self) && %{"${self}::"}){
+					$self = shift;
+					if($tj & TYPE_EXCLUDE){
+						SymObj::_complain_exclude($pkg, $pj) if ($flags & DEBUG);
+						$self = $tfields
+					}
+				}else{
+					$self = $tfields
+				}
+				if(@_){
+					SymObj::_complain_rdonly($pkg, $pj) if ($tj & TYPE_RDONLY) && ($flags & DEBUG);
+					$self->{$xj} = shift
+				}
+				$self->{$xj}
+			};
+		}
+	}
 
-   # Variable fields
-   ${"${pkg}::"}{_SymObj_PACKAGE} = $pkg;
-   ${"${pkg}::"}{_SymObj_ISA} = \@isa;
-   ${"${pkg}::"}{_SymObj_ALL_CTOR_ARGS} = \%actorargs;
-   ${"${pkg}::"}{_SymObj_CTOR_OVERRIDES} = \@ctorovers;
-   ${"${pkg}::"}{_SymObj_FIELDS} = $tfields;
-   ${"${pkg}::"}{_SymObj_FLAGS} = $flags;
+	# Variable fields
+	${"${pkg}::"}{_SymObj_PACKAGE} = $pkg;
+	${"${pkg}::"}{_SymObj_ISA} = \@isa;
+	${"${pkg}::"}{_SymObj_ALL_CTOR_ARGS} = \%actorargs;
+	${"${pkg}::"}{_SymObj_CTOR_OVERRIDES} = \@ctorovers;
+	${"${pkg}::"}{_SymObj_FIELDS} = $tfields;
+	${"${pkg}::"}{_SymObj_FLAGS} = $flags;
 
-   # User constructor?
-   if(!defined $ctor || ref $ctor ne 'CODE'){
-      my $_c = $ctor;
-      $_c = '__ctor' unless defined $_c;
-      $ctor = sub{ SymObj::_find_usr_ctor(shift, $pkg, $_c) };
-   }
-   ${"${pkg}::"}{_SymObj_USR_CTOR} = $ctor;
+	# User constructor?
+	if(!defined $ctor || ref $ctor ne 'CODE'){
+		my $_c = $ctor;
+		$_c = '__ctor' unless defined $_c;
+		$ctor = sub {SymObj::_find_usr_ctor(shift, $pkg, $_c)}
+	}
+	${"${pkg}::"}{_SymObj_USR_CTOR} = $ctor;
 
-   # new()
-   if($flags & DEBUG){
-      $ctor = sub {SymObj::_ctor_dbg($pkg, shift, \@_)};
-   }elsif($flags & _CLEANHIER){
-      $ctor = sub{
-         my ($class, $self) = (shift, {});
-         $self = bless $self, $class;
-         # Embed arguments
-         $self = SymObj::_ctor_argembed($pkg, $class, $self, \%actorargs,
-               \%actorargs, \@_);
-         # Fill what is not yet filled from arguments..
-         my $f = ($flags & DEEP_CLONE);
-         while(($i, $j) = each %actorargs){
-            $i = '_' . $i;
-            next if exists $self->{$i};
-            $self->{$i} = SymObj::clone_ref($$j, $f)
-         }
-         # Call user CTORs in correct order..
-         foreach $pkg (@isa){
-            if(defined(my $sym = ${"${pkg}::"}{_SymObj_USR_CTOR})){
-               &$sym($self)
-            }
-         }
-         $self
-      };
-   }else{
-      $ctor = sub {SymObj::_ctor_dirtyhier($pkg, shift, \@_)}
-   }
-   *{"${pkg}::new"} = $ctor;
+	# new()
+	if($flags & DEBUG){
+		$ctor = sub {SymObj::_ctor_dbg($pkg, shift, \@_)}
+	}elsif($flags & _CLEANHIER){
+		$ctor = sub{
+			my ($class, $self) = (shift, {});
+			$self = bless $self, $class;
+			# Embed arguments
+			$self = SymObj::_ctor_argembed($pkg, $class, $self, \%actorargs, \%actorargs, \@_);
 
-   1
+			# Fill what is not yet filled from arguments..
+			my $f = ($flags & DEEP_CLONE);
+			while(($i, $j) = each %actorargs){
+				$i = '_' . $i;
+				next if exists $self->{$i};
+				$self->{$i} = SymObj::clone_ref($$j, $f)
+			}
+			# Call user CTORs in correct order..
+			foreach $pkg (@isa){
+				if(defined(my $sym = ${"${pkg}::"}{_SymObj_USR_CTOR})){
+					&$sym($self)
+				}
+			}
+			$self
+		};
+	}else{
+		$ctor = sub {SymObj::_ctor_dirtyhier($pkg, shift, \@_)}
+	}
+	*{"${pkg}::new"} = $ctor;
+	1
 } # }}}
 
 sub clone_ref{ # {{{
-   my ($r, $deep) = @_;
+	my ($r, $deep) = @_;
 
-   if(!$deep){
-      if(ref $r eq 'ARRAY'){
-         my @a;
-         push @a, $_ foreach(@$r);
-         $r = \@a;
-      }elsif(ref $r eq 'HASH'){
-         my (%h, $hk, $hv);
-         while(($hk, $hv) = each %$r) {$h{$hk} = $hv}
-         $r = \%h
-      }
-   }else{
-      if(ref $r eq 'ARRAY'){
-         my @a;
-         push @a, SymObj::clone_ref($_, 1) foreach(@$r);
-         $r = \@a
-      }elsif(ref $r eq 'HASH'){
-         my (%h, $hk, $hv);
-         while(($hk, $hv) = each %$r) {$h{$hk} = SymObj::clone_ref($hv, 1)}
-         $r = \%h
-      }
-   }
-
-   $r
+	if(!$deep){
+		if(ref $r eq 'ARRAY'){
+			my @a;
+			push @a, $_ foreach(@$r);
+			$r = \@a
+		}elsif(ref $r eq 'HASH'){
+			my (%h, $hk, $hv);
+			while(($hk, $hv) = each %$r) {$h{$hk} = $hv}
+			$r = \%h
+		}
+	}else{
+		if(ref $r eq 'ARRAY'){
+			my @a;
+			push @a, SymObj::clone_ref($_, 1) foreach(@$r);
+			$r = \@a
+		}elsif(ref $r eq 'HASH'){
+			my (%h, $hk, $hv);
+			while(($hk, $hv) = each %$r) {$h{$hk} = SymObj::clone_ref($hv, 1)}
+			$r = \%h
+		}
+	}
+	$r
 } # }}}
 
 sub _resolve_tree{ # {{{
-   my ($pkg, $_actorargs, $_p, $_f, $_isa) = @_;
-   foreach my $c (@{${"${_p}::"}{ISA}}){
-      unless(%{"${c}::"}){
-         print $MsgFH "${pkg}: $_p: \@ISA contains non-existent ",
-               "class '$c'!\n" if ($$_f & DEBUG);
-         next
-      }
+	my ($pkg, $_actorargs, $_p, $_f, $_isa) = @_;
+	foreach my $c (@{${"${_p}::"}{ISA}}){
+		unless(%{"${c}::"}){
+			print $MsgFH "${pkg}: $_p: \@ISA contains non-existent class '$c'!\n" if ($$_f & DEBUG);
+			next
+		}
 
-      my $j = ${"${c}::"}{_SymObj_FLAGS};
-      unless(defined $j){
-         print $MsgFH "${pkg}: $_p:  '$c' not SymObj managed: hierarchy not ",
-               "clean, STOP!\n" if ($$_f & VERBOSE);
-         $$_f &= ~_CLEANHIER;
-         next
-      }
-      $$_f |= $j & (DEBUG | VERBOSE); # Inherit debug states
-      if(!($j & _CLEANHIER) && ($$_f & _CLEANHIER)){
-         $$_f &= ~_CLEANHIER;
-         print $MsgFH "${pkg}: $_p: '$c' says hierarchy is not clean..\n"
-            if ($$_f & VERBOSE)
-      }
+		my $j = ${"${c}::"}{_SymObj_FLAGS};
+		unless(defined $j){
+			print $MsgFH "${pkg}: $_p:  '$c' not SymObj managed: hierarchy not clean, STOP!\n"
+				if ($$_f & VERBOSE);
+			$$_f &= ~_CLEANHIER;
+			next
+		}
+		$$_f |= $j & (DEBUG | VERBOSE); # Inherit debug states
+		if(!($j & _CLEANHIER) && ($$_f & _CLEANHIER)){
+			$$_f &= ~_CLEANHIER;
+			print $MsgFH "${pkg}: $_p: '$c' says hierarchy is not clean..\n" if ($$_f & VERBOSE)
+		}
 
-      while(my ($k, $v) = each %{${"${c}::"}{_SymObj_ALL_CTOR_ARGS}}){
-         $_actorargs->{$k} = $v
-      }
+		while(my ($k, $v) = each %{${"${c}::"}{_SymObj_ALL_CTOR_ARGS}}){
+			$_actorargs->{$k} = $v
+		}
 
-      _resolve_tree($pkg, $_actorargs, $c, $_f, $_isa)
-         if defined ${"${c}::"}{ISA};
-      push @$_isa, $c
-   }
-   1
+		_resolve_tree($pkg, $_actorargs, $c, $_f, $_isa) if defined ${"${c}::"}{ISA};
+		push @$_isa, $c
+	}
+	1
 } # }}}
 
 sub _complain_exclude{
-   my ($pkg, $pub) = @_;
-   print $MsgFH "${pkg}::$pub(): field can't be accessed through object, ",
-      "accessing class-static!\n";
-   1
+	my ($pkg, $pub) = @_;
+	print $MsgFH "${pkg}::$pub(): field cannot be accessed through object, accessing class-static!\n";
+	1
 }
 
 sub _complain_rdonly{
-   my ($pkg, $pub) = @_;
-   print $MsgFH "${pkg}::$pub(): write access to READONLY field!\n";
-   1
+	my ($pkg, $pub) = @_;
+	print $MsgFH "${pkg}::$pub(): write access to READONLY field!\n";
+	1
 }
 
 sub _hash_set{ # {{{
-   my ($pkg, $self, $pub, $datum) = (shift, shift, shift, shift);
-   my ($flags, $dref, $k) = (${"${pkg}::"}{_SymObj_FLAGS}, $self->{$datum});
+	my ($pkg, $self, $pub, $datum) = (shift, shift, shift, shift);
+	my ($flags, $dref, $k) = (${"${pkg}::"}{_SymObj_FLAGS}, $self->{$datum});
 
-   $dref = $self->{$datum} = {} unless defined $dref;
+	$dref = $self->{$datum} = {} unless defined $dref;
 
-   foreach my $arg (@_){
-      if(defined $k){
-         $dref->{$k} = $arg;
-         $k = undef;
-         next
-      }
-      if(ref $arg eq 'HASH'){
-         while(my ($k, $v) = each %$arg){
-            $dref->{$k} = $v
-         }
-      }elsif(ref $arg eq 'ARRAY'){
-         while(@$arg > 1){
-            my $v = pop @$arg;
-            my $k = pop @$arg;
-            $dref->{$k} = $v
-         }
-         print $MsgFH "! ${pkg}::$pub(): wrong array member count!\n"
-            if @$arg != 0 && ($flags & DEBUG)
-      }else{
-         $k = $arg
-      }
-   }
-   print $MsgFH "! ${pkg}::$pub(): '$k' key without a value\n"
-      if defined $k && ($flags & DEBUG);
-   $dref
+	foreach my $arg (@_){
+		if(defined $k){
+			$dref->{$k} = $arg;
+			$k = undef;
+			next
+		}
+		if(ref $arg eq 'HASH'){
+			while(my ($k, $v) = each %$arg){
+				$dref->{$k} = $v
+			}
+		}elsif(ref $arg eq 'ARRAY'){
+			while(@$arg > 1){
+				my $v = pop @$arg;
+				my $k = pop @$arg;
+				$dref->{$k} = $v
+			}
+			print $MsgFH "! ${pkg}::$pub(): wrong array member count!\n" if @$arg != 0 && ($flags & DEBUG)
+		}else{
+			$k = $arg
+		}
+	}
+	print $MsgFH "! ${pkg}::$pub(): '$k' key without a value\n" if defined $k && ($flags & DEBUG);
+	$dref
 } # }}}
 
 sub _array_set{ # {{{
-   my ($pkg, $self, $pub, $datum) = (shift, shift, shift, shift);
-   my $dref = $self->{$datum};
+	my ($pkg, $self, $pub, $datum) = (shift, shift, shift, shift);
+	my $dref = $self->{$datum};
 
-   $dref = $self->{$datum} = [] unless defined $dref;
+	$dref = $self->{$datum} = [] unless defined $dref;
 
-   foreach my $arg (@_){
-      if(ref $arg eq 'ARRAY'){
-         push @$dref, $_ foreach(@$arg)
-      }elsif(ref $arg eq 'HASH'){
-         while(my ($k, $v) = each %$arg){
-            push @$dref, $k;
-            push @$dref, $v
-         }
-      }else{
-         push @$dref, $arg
-      }
-   }
-   $dref
+	foreach my $arg (@_){
+		if(ref $arg eq 'ARRAY'){
+			push @$dref, $_ foreach(@$arg)
+		}elsif(ref $arg eq 'HASH'){
+			while(my ($k, $v) = each %$arg){
+				push @$dref, $k;
+				push @$dref, $v
+			}
+		}else{
+			push @$dref, $arg
+		}
+	}
+	$dref
 } # }}}
 
 sub _find_usr_ctor{ # {{{
-   # No constructor was given to sym_create(), or it was no code-ref.
-   # Try to find out what the user wants.
-   my ($self, $pkg, $ctor) = @_;
-   my $flags = ${"${pkg}::"}{_SymObj_FLAGS};
-   unless(defined ${"${pkg}::"}{$ctor}){
-      print $MsgFH "${pkg}: no user ctor\n" if ($flags & VERBOSE);
-      delete ${"${pkg}::"}{_SymObj_USR_CTOR}
-   }else{
-      print $MsgFH "${pkg}: resolved user ctor '$ctor'\n" if ($flags & VERBOSE);
-      $ctor = ${"${pkg}::"}{$ctor};
-      ${"${pkg}::"}{_SymObj_USR_CTOR} = $ctor;
-      &$ctor($self)
-   }
-   1
+	# No constructor was given to sym_create(), or it was no code-ref.  Try to find out what the user wants.
+	my ($self, $pkg, $ctor) = @_;
+	my $flags = ${"${pkg}::"}{_SymObj_FLAGS};
+	unless(defined ${"${pkg}::"}{$ctor}){
+		print $MsgFH "${pkg}: no user ctor\n" if ($flags & VERBOSE);
+		delete ${"${pkg}::"}{_SymObj_USR_CTOR}
+	}else{
+		print $MsgFH "${pkg}: resolved user ctor '$ctor'\n" if ($flags & VERBOSE);
+		$ctor = ${"${pkg}::"}{$ctor};
+		${"${pkg}::"}{_SymObj_USR_CTOR} = $ctor;
+		&$ctor($self)
+	}
+	1
 } # }}}
 
 sub _ctor_dbg{ # {{{
-   my ($pkg, $class, $argaref) = @_;
-   my $flags = ${"${pkg}::"}{_SymObj_FLAGS};
-   print $MsgFH "SymObj::obj_ctor <> new: $pkg called as $class\n"
-      if ($flags & VERBOSE);
+	my ($pkg, $class, $argaref) = @_;
+	my $flags = ${"${pkg}::"}{_SymObj_FLAGS};
+	print $MsgFH "SymObj::obj_ctor <> new: $pkg called as $class\n" if ($flags & VERBOSE);
 
-   my ($self, $actorargs, $ctorovers, $tfields, $init_chain, $i, $j, $k) =
-      (undef, ${"${pkg}::"}{_SymObj_ALL_CTOR_ARGS},
-      ${"${pkg}::"}{_SymObj_CTOR_OVERRIDES}, ${"${pkg}::"}{_SymObj_FIELDS});
+	my ($self, $actorargs, $ctorovers, $tfields, $init_chain, $i, $j, $k) = (undef,
+			${"${pkg}::"}{_SymObj_ALL_CTOR_ARGS}, ${"${pkg}::"}{_SymObj_CTOR_OVERRIDES},
+			${"${pkg}::"}{_SymObj_FIELDS});
 
-   # Use a savage and hacky but multithread-safe way to perform argument
-   # checking only in the ctor of the real (actual sub-) class (a.k.a. once)
-   $init_chain = @$argaref > 0 && defined $argaref->[0] &&
-      $argaref->[0] eq _UUID;
+	# Use a savage and hacky but multithread-safe way to perform argument
+	# checking only in the ctor of the real (actual sub-) class (a.k.a. once)
+	$init_chain = @$argaref > 0 && defined $argaref->[0] && $argaref->[0] eq _UUID;
 
-   # Inheritance handling
-   if(defined ${"${pkg}::"}{ISA}){
-      # Append overrides
-      foreach $k (@$ctorovers){
-         for($i = $init_chain, $j = @$argaref; $i < $j; $i += 2){
-            goto j_OVW if $k eq $$argaref[$i]
-         }
-         push @$argaref, $k;
-         push @$argaref, $tfields->{'_' . $k};
+	# Inheritance handling
+	if(defined ${"${pkg}::"}{ISA}){
+		# Append overrides
+		foreach $k (@$ctorovers){
+			for($i = $init_chain, $j = @$argaref; $i < $j; $i += 2){
+				goto j_OVW if $k eq $$argaref[$i]
+			}
+			push @$argaref, $k;
+			push @$argaref, $tfields->{'_' . $k};
 j_OVW:
-      }
+		}
 
-      # Walk the new() chain, but disallow arg-checking for superclasses
-      unshift @$argaref, _UUID if !$init_chain;
+		# Walk the new() chain, but disallow arg-checking for superclasses
+		unshift @$argaref, _UUID if !$init_chain;
 
-      foreach my $c (@{${"${pkg}::"}{ISA}}){
-         unless(defined ${"${c}::"}{new}){
-            print $MsgFH "${pkg}: $class->new(): no such package: $c!\n"
-               and next unless %{"${c}::"};
-            print $MsgFH "${pkg}: $class->new(): $c: misses a new() sub!\n";
-            next
-         }
-         $i = &{${"${c}::"}{new}}($class, @$argaref);
+		foreach my $c (@{${"${pkg}::"}{ISA}}){
+			unless(defined ${"${c}::"}{new}){
+				print $MsgFH "${pkg}: $class->new(): no such package: $c!\n" and next
+					unless %{"${c}::"};
+				print $MsgFH "${pkg}: $class->new(): $c: misses a new() sub!\n";
+				next
+			}
+			$i = &{${"${c}::"}{new}}($class, @$argaref);
 
-         # (MI restriction applies here: if $self is yet a {} the other tree
-         # can only be joined in and thus looses it's hash-pointer)
-         $self = $i and next unless defined $self;
-         while(($k, $j) = each %$i) {$self->{$k} = $j}
-      }
+			# (MI restriction applies here: if $self is yet a {} the other tree can only be joined in
+			# and thus looses it's hash-pointer)
+			$self = $i and next unless defined $self;
+			while(($k, $j) = each %$i) {$self->{$k} = $j}
+		}
 
-      shift @$argaref if !$init_chain
-   }
+		shift @$argaref if !$init_chain
+	}
 
-   # SELF
-   $self = {} unless defined $self;
-   $self = bless $self, $class;
+	# SELF
+	$self = {} unless defined $self;
+	$self = bless $self, $class;
 
-   # Normal arguments; can and should we perform argument checking?
-   shift @$argaref if $init_chain;
-   if(@$argaref & 1){
-      pop @$argaref;
-      print $MsgFH "${pkg}: $class->new(): odd argument discarded!\n"
-   }
+	# Normal arguments; can and should we perform argument checking?
+	shift @$argaref if $init_chain;
+	if(@$argaref & 1){
+		pop @$argaref;
+		print $MsgFH "${pkg}: $class->new(): odd argument discarded!\n"
+	}
 
-   # Embed arguments
-   $self->{_UID} = undef if $init_chain;
-   $self = SymObj::_ctor_argembed($pkg, $class, $self, $actorargs, $tfields,
-         $argaref);
-   delete $self->{_UID} if $init_chain;
+	# Embed arguments
+	$self->{_UID} = undef if $init_chain;
+	$self = SymObj::_ctor_argembed($pkg, $class, $self, $actorargs, $tfields, $argaref);
+	delete $self->{_UID} if $init_chain;
 
-   # Finally: fill in yet unset members of $self via the per-class template.
-   $j = $flags;
-   if(exists ${"${class}::"}{_SymObj_FLAGS}){
-      $j = ${"${class}::"}{_SymObj_FLAGS}
-   }
-   $j &= DEEP_CLONE;
-   while(($k, $i) = each %$tfields){
-      next if exists $self->{$k};
-      if(ref $i && ref $i ne 'HASH' && ref $i ne 'ARRAY'){
-         print $MsgFH "${pkg}: $class->new(): value of '$k' has an ",
-            "unsupported type!\n";
-         next
-      }
-      $self->{$k} = SymObj::clone_ref($i, $j)
-   }
+	# Finally: fill in yet unset members of $self via the per-class template.
+	$j = $flags;
+	if(exists ${"${class}::"}{_SymObj_FLAGS}){
+		$j = ${"${class}::"}{_SymObj_FLAGS}
+	}
+	$j &= DEEP_CLONE;
+	while(($k, $i) = each %$tfields){
+		next if exists $self->{$k};
+		if(ref $i && ref $i ne 'HASH' && ref $i ne 'ARRAY'){
+			print $MsgFH "${pkg}: $class->new(): value of '$k' has an unsupported type!\n";
+			next
+		}
+		$self->{$k} = SymObj::clone_ref($i, $j)
+	}
 
-   # Call further init code, if defined
-   if(defined($i = ${"${pkg}::"}{_SymObj_USR_CTOR})){
-      &$i($self)
-   }
-   $self
+	# Call further init code, if defined
+	if(defined($i = ${"${pkg}::"}{_SymObj_USR_CTOR})){
+		&$i($self)
+	}
+	$self
 } # }}}
 
 sub _ctor_dirtyhier{ # (Stripped version of _dbg) {{{
-   my ($pkg, $class, $argaref) = @_;
+	my ($pkg, $class, $argaref) = @_;
 
-   my ($self, $actorargs, $ctorovers, $tfields, $i, $j, $k) =
-      (undef, ${"${pkg}::"}{_SymObj_ALL_CTOR_ARGS},
-      ${"${pkg}::"}{_SymObj_CTOR_OVERRIDES}, ${"${pkg}::"}{_SymObj_FIELDS});
+	my ($self, $actorargs, $ctorovers, $tfields, $i, $j, $k) = (undef, ${"${pkg}::"}{_SymObj_ALL_CTOR_ARGS},
+			${"${pkg}::"}{_SymObj_CTOR_OVERRIDES}, ${"${pkg}::"}{_SymObj_FIELDS});
 
-   if(defined ${"${pkg}::"}{ISA}){
-      foreach $k (@$ctorovers){
-         for($i = 0, $j = @$argaref; $i < $j; $i += 2){
-            goto j_OVW if $k eq $$argaref[$i]
-         }
-         push @$argaref, $k;
-         push @$argaref, $tfields->{'_' . $k};
-j_OVW:}
+	if(defined ${"${pkg}::"}{ISA}){
+		foreach $k (@$ctorovers){
+			for($i = 0, $j = @$argaref; $i < $j; $i += 2){
+				goto j_OVW if $k eq $$argaref[$i]
+			}
+			push @$argaref, $k;
+			push @$argaref, $tfields->{'_' . $k};
+j_OVW:
+		}
 
-      foreach my $c (@{${"${pkg}::"}{ISA}}){
-         unless(defined ${"${c}::"}{new}){
-            next
-         }
-         $i = &{${"${c}::"}{new}}($class, @$argaref);
+		foreach my $c (@{${"${pkg}::"}{ISA}}){
+			unless(defined ${"${c}::"}{new}){
+				next
+			}
+			$i = &{${"${c}::"}{new}}($class, @$argaref);
+			$self = $i and next unless defined $self;
+			while(($k, $j) = each %$i) {$self->{$k} = $j}
+		}
+	}
 
-         $self = $i and next unless defined $self;
-         while(($k, $j) = each %$i){ $self->{$k} = $j }
-      }
-   }
+	$self = {} unless defined $self;
+	$self = bless $self, $class;
 
-   $self = {} unless defined $self;
-   $self = bless $self, $class;
+	# Embed arguments
+	$self = SymObj::_ctor_argembed($pkg, $class, $self, $actorargs, $tfields, $argaref);
 
-   # Embed arguments
-   $self = SymObj::_ctor_argembed($pkg, $class, $self, $actorargs, $tfields,
-         $argaref);
+	# Fill what is not yet filled from arguments..
+	if(exists ${"${class}::"}{_SymObj_FLAGS}){
+		$j = ${"${class}::"}{_SymObj_FLAGS}
+	}else{
+		$j = ${"${pkg}::"}{_SymObj_FLAGS}
+	}
+	$j &= DEEP_CLONE;
+	while(($k, $i) = each %$tfields){
+		next if exists $self->{$k};
+		$self->{$k} = SymObj::clone_ref($i, $j)
+	}
 
-   # Fill what is not yet filled from arguments..
-   if(exists ${"${class}::"}{_SymObj_FLAGS}){
-      $j = ${"${class}::"}{_SymObj_FLAGS}
-   }else{
-      $j = ${"${pkg}::"}{_SymObj_FLAGS}
-   }
-   $j &= DEEP_CLONE;
-   while(($k, $i) = each %$tfields){
-      next if exists $self->{$k};
-      $self->{$k} = SymObj::clone_ref($i, $j)
-   }
-
-   if(defined($i = ${"${pkg}::"}{_SymObj_USR_CTOR})){
-      &$i($self)
-   }
-   $self
+	if(defined($i = ${"${pkg}::"}{_SymObj_USR_CTOR})){
+		&$i($self)
+	}
+	$self
 } # }}}
 
 sub _ctor_argembed{ # {{{
-   my ($pkg, $class, $self, $argsr, $myargsr, $usrr) = @_;
-   my ($isident, $k, $pk, $v, $r) = ($argsr == $myargsr);
+	my ($pkg, $class, $self, $argsr, $myargsr, $usrr) = @_;
+	my ($isident, $k, $pk, $v, $r) = ($argsr == $myargsr);
 
-   while(@$usrr){
-      $k = shift @$usrr;
-      $v = shift @$usrr;
-      unless(exists $argsr->{$k}){
-         next if exists $self->{_UID};
-         print $MsgFH "${pkg}: $class->new(): unknown argument: '$k'\n";
-         next
-      }
-      $r = ${$argsr->{$k}};
-      $pk = '_' . $k;
-      # In non-optimized case: is this an arg of $pkg?
-      next unless $isident || exists $myargsr->{$pk};
+	while(@$usrr){
+		$k = shift @$usrr;
+		$v = shift @$usrr;
+		unless(exists $argsr->{$k}){
+			next if exists $self->{_UID};
+			print $MsgFH "${pkg}: $class->new(): unknown argument: '$k'\n";
+			next
+		}
+		$r = ${$argsr->{$k}};
+		$pk = '_' . $k;
+		# In non-optimized case: is this an arg of $pkg?
+		next unless $isident || exists $myargsr->{$pk};
 
-      if(ref $r eq 'ARRAY'){
-         Symobj::_array_set($pkg, $self, $k, $pk, $v)
-      }elsif(ref $r eq 'HASH'){
-         unless(ref $v eq 'ARRAY' || ref $v eq 'HASH'){
-            print $MsgFH "${pkg}: $class->new(): ",
-                  "'$k' requires ARRAY or HASH argument\n";
-            next
-         }
-         Symobj::_hash_set($pkg, $self, $k, $pk, $v)
-      }else{
-         $self->{$pk} = $v
-      }
-   }
-   $self
+		if(ref $r eq 'ARRAY'){
+			Symobj::_array_set($pkg, $self, $k, $pk, $v)
+		}elsif(ref $r eq 'HASH'){
+			unless(ref $v eq 'ARRAY' || ref $v eq 'HASH'){
+				print $MsgFH "${pkg}: $class->new(): '$k' requires ARRAY or HASH argument\n";
+				next
+			}
+			Symobj::_hash_set($pkg, $self, $k, $pk, $v)
+		}else{
+			$self->{$pk} = $v
+		}
+	}
+	$self
 } # }}}
 1;
 __END__
@@ -573,70 +547,69 @@ S-SymObj -- an easy way to create symbol-tables and objects.
 
 =head1 SYNOPSIS
 
-   use diagnostics -verbose;
-   use strict;
-   use warnings;
-   # You need to require it in a BEGIN{}..; $Debug may be one of 0/1/2
-   BEGIN{ require SymObj; $SymObj::Debug = 2 }
+	#use diagnostics -verbose;
+	use strict;
+	use warnings;
+	# You need to require it in a BEGIN{}..; $Debug may be one of 0/1/2
+	BEGIN{ require SymObj; $SymObj::Debug = 2 }
 
-   # Accessor subs return references for hashes and arrays (but shallow
-   # clones in wantarray context), scalars are returned "as-is"
-   {package X1;
-      SymObj::sym_create(SymObj::NONE, { # (NONE is 0..)
-         _name => '', _array => [qw(Is Easy)],
-         _hash => {To => 'hv1', Use => 'hv2'},
-         boing => undef}) # <- $SymObj::Debug will complain!  FAILS!
-   }
-   my $o = X1->new(name => 'SymObj');
-   print $o->name, ' ';
-   print join(' ', @{$o->array}), ' ';
-   print join(' ', keys %{$o->hash}), "\n";
+	# Accessor subs return references for hashes and arrays (but shallow
+	# clones in wantarray context), scalars are returned "as-is"
+	{package X1;
+		SymObj::sym_create(SymObj::NONE, { # (NONE is 0..)
+			_name => '', _array => [qw(Is Easy)],
+			_hash => {To => 'hv1', Use => 'hv2'},
+			boing => undef}) # <- $SymObj::Debug complain! FAILS!
+	}
+	my $o = X1->new(name => 'SymObj');
+	print $o->name, ' ';
+	print join(' ', @{$o->array}), ' ';
+	print join(' ', keys %{$o->hash}), "\n";
 
-   # Unknown arguments are detected when DEBUG/VERBOSE is enabled.
-   {package X2;
-      our @ISA = ('X1');
-      SymObj::sym_create(0, {}) # <- adds no fields on its own
-   }
-   # (Clean hierarchy has optimized constructor which is used, then)
-   if($SymObj::Debug != 0){
-      $o = X2->new(name => 'It detects some misuses (if $Debug > 0)',
-         'un' => 'known argument catched')
-   }else{
-      $o = X2->new(name => 'It detects some misuses (if $Debug > 0)')
-   }
-   print $o->name, "\n";
+	# Unknown arguments are detected when DEBUG/VERBOSE is enabled.
+	{package X2;
+		our @ISA = ('X1');
+		SymObj::sym_create(0, {}) # <- adds no fields on its own
+	}
+	# (Clean hierarchy has optimized constructor which is used, then)
+	if($SymObj::Debug != 0){
+		$o = X2->new(name => 'Misuse detected (if $Debug > 0)',
+		'un' => 'known argument catched')
+	}else{
+		$o = X2->new(name => 'Misuse detected (if $Debug > 0)')
+	}
+	print $o->name, "\n";
 
-   # Fields which mirror fieldnames of superclasses define overrides.
-   {package X3;
-      our @ISA = ('X2');
-      SymObj::sym_create(0, {'_name' => 'Auto superclass-ovw'},
-         sub{ my $self = shift; print "X3 usr ctor\n" })
-   }
-   $o = X3->new();
-   print $o->name, "\n";
+	# Fields which mirror fieldnames of superclasses define overrides.
+	{package X3;
+		our @ISA = ('X2');
+		SymObj::sym_create(0, {'_name' => 'Auto superclass-ovw'},
+			sub {my $self = shift; print "X3 usr ctor\n"})
+	}
+	$o = X3->new();
+	print $o->name, "\n";
 
-   # One may enforce creation of array/hash accessors even for undef
-   # values by using the @/% type modifiers; the objects themselves
-   # are lazy-created as necessary, then...
-   {package X4;
-      our @ISA = ('X3');
-      SymObj::sym_create(0, {'%_hash2'=>undef, '@_array2'=>undef});
-      sub __ctor{ my $self = shift; print "X4 usr ctor\n" }
-   }
-   $o = X4->new(name => 'A X4');
-   die 'Lazy-allocation failed'
-      if !defined $o->hash2 || !defined $o->array2;
-   print join(' ', keys %{$o->hash2(Allocation=>1, Lazy=>1)}), ' ';
-   print join(' ', @{$o->array2(qw(Can Be Used))}), "\n";
+	# One may enforce creation of array/hash accessors even for undef
+	# values by using the @/% type modifiers; the objects themselves
+	# are lazy-created as necessary, then...
+	{package X4;
+		our @ISA = ('X3');
+		SymObj::sym_create(0, {'%_hash2'=>undef, '@_array2'=>undef});
+		sub __ctor {my $self = shift; print "X4 usr ctor\n"}
+	}
+	$o = X4->new(name => 'A X4');
+	die 'Lazy-alloc failed' if !defined $o->hash2 || !defined $o->array2;
+	print join(' ', keys %{$o->hash2(Allocation=>1, Lazy=>1)}), ' ';
+	print join(' ', @{$o->array2(qw(Can Be Used))}), "\n";
 
-   %{$o->hash2} = ();
-   $o->hash2(HashAndArray => 'easy');
-   $o->hash2(qw(Accessors development));
-   $o->hash2('Really', 'is');
-   $o->hash2(['Swallow', 'possible']);
-   $o->hash2({ Anything => 'here' });
-   print join(' ', keys %{$o->hash2}), "\n"
-   # P.S.: this is also true for the constructor(s)
+	%{$o->hash2} = ();
+	$o->hash2(HashAndArray => 'easy');
+	$o->hash2(qw(Accessors development));
+	$o->hash2('Really', 'is');
+	$o->hash2(['Swallow', 'possible']);
+	$o->hash2({ Anything => 'here' });
+	print join(' ', keys %{$o->hash2}), "\n"
+	# P.S.: this is also true for the constructor(s)
 
 =head1 DESCRIPTION
 
@@ -653,7 +626,7 @@ error checking constructor is used.  Otherwise a straight constructor
 without any checking will be created; and if the managed object is the
 head of a "clean" object tree, i.e., one that is entirely managed by
 S-SymObj, then a super-fast super-lean constructor implementation is
-used that'll rock your house.
+used that will rock your house.
 
 SymObj.pm works for Multiple-Inheritance as good as perl(1) allows.
 (That is to say that only one straight object tree can be used, further
@@ -670,20 +643,20 @@ actually).
 B<Note> that it is not possible to use an object tree with mixed
 S-SymObj managed and non-managed classes in B<mixed order>, as in
 I<MANAGED subclassof NON-MANAGED subclassof MANAGED>, because tree
-traversal actually stops once a I<NON-MANAGED> class is seen.  This
+traversal actually stops once a I<NON-MANAGED> class is seen.	This
 is logical, because non-managed classes do not contain the necessary
 information for S-SymObj to function.
 
 The SymObj module is available on CPAN.  The S-SymObj project is located
 at L<https://www.sdaoden.eu/code.html>.  It is developed using a git(1)
-repository, which is located at C<https://git.sdaoden.eu/scm/s-symobj.git>
-(browse it at L<https://git.sdaoden.eu/browse/s-symobj.git>).
+repository located at C<https://git.sdaoden.eu/scm/s-symobj.git>
+(browse at L<https://git.sdaoden.eu/browse/s-symobj.git>).
 
 =head1 INTERFACE
 
 =over
 
-=item C<$VERSION> (string, i.e., '0.8.2')
+=item C<$VERSION> (string, i.e., '0.8.3')
 
 A version string.
 
@@ -734,23 +707,23 @@ array or hash, that very array or hash is cloned, but the values within
 it are only reference copied.  But if this flag is set then array and
 hash members are I<recursively> cloned in addition.  E.g.:
 
-   SymObj::sym_create(SymObj::NONE, {array => [1, [2, 3]]});
-   ->
-   $o = XXX->new;
-   die unless $o->array->[1]->[0] == 2;
-   XXX::array()->[0] = -1;
-   die unless $o->array->[0] == 1;
-   XXX::array()->[1]->[0] = -2;
-   die unless $o->array->[1]->[0] == -2;
+	SymObj::sym_create(SymObj::NONE, {array => [1, [2, 3]]});
+	->
+	$o = XXX->new;
+	die unless $o->array->[1]->[0] == 2;
+	XXX::array()->[0] = -1;
+	die unless $o->array->[0] == 1;
+	XXX::array()->[1]->[0] = -2;
+	die unless $o->array->[1]->[0] == -2;
 
-   SymObj::sym_create(SymObj::DEEP_CLONE, {array => [1, [2, 3]]});
-   ->
-   $o = XXX->new;
-   die unless $o->array->[1]->[0] == 2;
-   XXX::array()->[0] = -1;
-   die unless $o->array->[0] == 1;
-   XXX::array()->[1]->[0] = -2;
-   die unless $o->array->[1]->[0] == 2
+	SymObj::sym_create(SymObj::DEEP_CLONE, {array => [1, [2, 3]]});
+	->
+	$o = XXX->new;
+	die unless $o->array->[1]->[0] == 2;
+	XXX::array()->[0] = -1;
+	die unless $o->array->[0] == 1;
+	XXX::array()->[1]->[0] = -2;
+	die unless $o->array->[1]->[0] == 2
 
 This flag will be overwritten by subclasses, i.e., the C<DEEP_CLONE>
 state of the I<actually instantiated> subclass is what is used to
@@ -789,7 +762,7 @@ to perform additional setup of C<$self> as necessary.  These user
 constructors take two arguments, C<$self>, the newly created object,
 and C<$pkg>, the class name of the actual (sub)class that is
 instantiated.  (Well, maybe partially created up to some point in
-C<@ISA>.)  The user constructor doesn't have a return value.
+C<@ISA>.)  The user constructor does not have a return value.
 
 If C<$3> is used, it must either be a code-reference or a string.  In
 the latter case S-SymObj will try to locate a method of the given name
@@ -804,7 +777,7 @@ SymObj generally "enforces" privacy (by definition) via an underscore
 prefix: all keys of C<$2> are expected to start with an underscore,
 but the public accessor methods will miss that (C<_data> becomes
 C<data>).  This is actually a requirement that is checked if debug is
-enabled, since SymObj won't function properly for this field otherwise.
+enabled, since SymObj will not function properly for this field otherwise.
 
 The created accessor subs work as methods if the first argument that
 is seen is a reference that seems to be a class instantiation (i.e.,
@@ -812,7 +785,7 @@ C<$self>, as in C<$self-E<gt>name()>) and as functions otherwise
 (C<SomePack::name()>), in which case the provided package template
 hash (C<$2>) is used!  (Note that no locking is performed in the latter
 case, i.e., this should not be done in multithreaded programs.)  If
-they act upon arrays or hashes they'll return references to the members
+they act upon arrays or hashes they will return references to the members
 by default, but do return shallow clones in C<wantarray> context instead.
 
 If a key in C<$2> is prefixed with an AT or a PERCENT, as in C<'@_name'>
@@ -841,7 +814,7 @@ class-static hash, with the accessor subroutinge C<name>.
 In addition to those accessor subs there will I<always> be private
 accessor subs be created which use the public name prefixed with two
 underscores, as in C<$self-E<gt>__name()>.  These subs do nothing
-except returning a reference to the field in question.  They're ment
+except returning a reference to the field in question.  They are meant
 to be used instead of direct access to members in some contexts, i.e.,
 for encapsulation purposes.  Note that they do I<not> automatically
 instantiate lazy allocated fields.
@@ -852,7 +825,7 @@ is provided in C<$2>, one specifies an overwrite request, and it is
 verified that the value type matches.  Unfortunately the subclass will
 create accessor subs on its own, because users need to be able to
 adjust the class-static data.  And, also unfortunately, different
-access policies won't be detected.
+access policies will not be detected.
 
 =item C<clone_ref($1=ref, $2=boolean=deep-clone-reference)>
 
@@ -885,12 +858,12 @@ is the entire unfolded class tree, unfolded in down-top, left-right
 =item C<$_SymObj_ALL_CTOR_ARGS>
 
 A hash that includes all arguments that the constructor is allowed to
-take.  (Won't cover classes that are not managed by S-SymObj.)
+take.  (Will not cover classes that are not managed by S-SymObj.)
 
 =item C<$_SymObj_CTOR_OVERRIDES>
 
 A list of all fields that this package overrides from superclasses.
-(Won't cover classes that are not managed by S-SymObj.)
+(Will not cover classes that are not managed by S-SymObj.)
 
 =item C<$_SymObj_FIELDS>
 
@@ -903,7 +876,7 @@ Some flags. :)
 
 =item C<$_SymObj_USR_CTOR>
 
-An optional field that holds a reference to the users constructor (once
+An optional field that holds a reference to the user's constructor (once
 resolved).
 
 =item C<new()>
@@ -916,9 +889,14 @@ The auto-generated public class constructor.
 
 =over
 
+=item v0.8.3, 202X-XX-XX
+
+New source code style.  Documentation reread.
+No functional change (since v0.8.0, 2012-12-17).
+
 =item v0.8.2, 2016-10-24
 
-Fixed false spelling, updated URLs, new source-code style.
+Fixed false spelling, updated URLs, new source code style.
 No functional change (since v0.8.0, 2012-12-17).
 
 =item v0.8.1, 2016-01-05
@@ -950,10 +928,10 @@ point out that i wrote this package the hard way.  It is I.
 
 =head1 LICENSE
 
-Copyright (c) 2010 - 2021 Steffen Nurpmeso.
+Copyright (c) 2010 - 2022 Steffen Nurpmeso.
 ISC license.
 
 =cut
 # }}}
 
-# s-it-mode
+# s-itt-mode
